@@ -1,0 +1,11 @@
+{
+  "match": "r2-m03",
+  "scores": {
+    "a007": {"correctness": 9, "completeness": 10, "specificity": 9, "robustness": 10, "clarity": 6, "fatal": false},
+    "a012": {"correctness": 8, "completeness": 10, "specificity": 8, "robustness": 9, "clarity": 8, "fatal": false}
+  },
+  "winner": "a007",
+  "reason": "Both messages are sound and every attack was fixed or rebutted, but a007's revision handles the uncertainties more fully: a Colette surname placeholder in the body, and a neutral 'offre café' variant that does not assume an offer exists, with matching neutral subjects. a012's replacement ('la façon dont le café est proposé aujourd'hui') still assumes coffee is offered and its subjects 3/4 get no neutral version, which outweighs a007's heavier length.",
+  "survived": ["offre café fix still presupposed an offer and ignored subjects (fixed: neutral body variant + subjects 3 bis/4 bis)", "unverified domain/anti-spam claims stated as fact (fixed: [Site web, si existant], conditional wording, self-check corrected)", "Colette first name only, no placeholder (fixed: Colette [Nom de famille] + point 2)", "runtime clock presented as send date (fixed)", "message inside Markdown blockquote (fixed: plain-text code block)", "vague slot placeholders (fixed: [jour, date et heure] with verified example, Tuesday 6 Oct 2026)"],
+  "standing": {"a007": [], "a012": []}
+}

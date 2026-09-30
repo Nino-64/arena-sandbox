@@ -26,10 +26,10 @@
      "how": "Be exhaustive and exact. Check every step, verify every claim, and leave no hand-waving anywhere."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m03.a001.solution.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r2/r2-m01.a001.solution.md",
+   "alive": false,
+   "eliminated_in": 2,
+   "eliminated_by": "a014",
    "byes": 0
   },
   "a002": {
@@ -146,7 +146,7 @@
      "how": "Be exhaustive and exact. Check every step, verify every claim, and leave no hand-waving anywhere."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m08.a006.solution.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r2/r2-m02.a006.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -170,7 +170,7 @@
      "how": "Name the real trade-offs, choose for the user's most likely constraints, and say plainly what that choice gives up."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m01.a007.solution.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r2/r2-m03.a007.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -194,10 +194,10 @@
      "how": "Pick the least complicated answer that fully does the job. Every extra part has to justify itself."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m06.a008.solution.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r2/r2-m02.a008.solution.md",
+   "alive": false,
+   "eliminated_in": 2,
+   "eliminated_by": "a006",
    "byes": 0
   },
   "a009": {
@@ -266,7 +266,7 @@
      "how": "Optimise for how this holds up in six months: easy to maintain, easy to extend, no traps for the next person."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m05.a011.solution.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r2/r2-m04.a011.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -290,10 +290,10 @@
      "how": "Leave out nothing the task asks for or clearly implies. Cover every requirement explicitly."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m07.a012.solution.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r2/r2-m03.a012.solution.md",
+   "alive": false,
+   "eliminated_in": 2,
+   "eliminated_by": "a007",
    "byes": 0
   },
   "a013": {
@@ -338,7 +338,7 @@
      "how": "Assume the inputs are bad and the conditions are hostile. Make the answer fail safely and loudly rather than quietly."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m04.a014.solution.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r2/r2-m01.a014.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -386,10 +386,10 @@
      "how": "Remove things until it breaks, then put the last one back. Fewer steps, fewer dependencies, fewer words."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m02.a016.solution.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r2/r2-m04.a016.solution.md",
+   "alive": false,
+   "eliminated_in": 2,
+   "eliminated_by": "a011",
    "byes": 0
   }
  },
@@ -588,28 +588,97 @@
      "id": "r2-m01",
      "a": "a001",
      "b": "a014",
-     "winner": null,
-     "loser": null,
-     "reason": null,
-     "survived": [],
-     "scores": null,
-     "source": null
+     "winner": "a014",
+     "loser": "a001",
+     "reason": "Both fixed every attack, but a001's fix for the no-Colette case added opening C, 'Je me permets de vous contacter en tant qu'Hospitality Manager de Have a Good Day', which reads in French as if the sender were the Hospitality Manager and gives a cold opening with no source (the flaw a014 conceded and removed), and a001 recommends that opening even when Colette simply cannot be reached; a014 ships ",
+     "survived": [
+      "contradictory refusal branch: now says not to send and to state the real source via a placeholder",
+      "Colette first-name-only ambiguity: [Nom de famille] placeholder plus a rule and a listed uncertainty",
+      "inconsistent fallback subject: same rule (n\u00b01, else n\u00b03 or n\u00b05) in every section"
+     ],
+     "scores": {
+      "a001": 78.0,
+      "a014": 89.0
+     },
+     "source": "judge"
     },
     {
      "id": "r2-m02",
      "a": "a006",
      "b": "a008",
-     "winner": null,
-     "loser": null,
-     "reason": null,
-     "survived": [],
-     "scores": null,
-     "source": null
+     "winner": "a006",
+     "loser": "a008",
+     "reason": "Both fixed every attack, but a006 puts a cleaner, send-ready message first with a simple bracketed two-slot call to action and a prominent placeholder checklist (including a final search for '['), while a008's nested optional-bracket clause '[, de [dur\u00e9e], [format], [p\u00e9riode]]' plus 'Colette [Nom]' is clunky and error-prone to finalize and its diagnosis comes before the deliverable.",
+     "survived": [
+      "doubting the brief's 'offre caf\u00e9 actuelle' (body now uses the brief's wording)",
+      "text pushing the reader away from the link (now 'parcourir \u00e0 votre rythme')",
+      "default subject assuming Illan knows Colette (now hedged with subject 3 fallback)",
+      "'con\u00e7ue pour' not in context (now 'd\u00e9di\u00e9e aux espaces de bureau')",
+      "body time-slot placeholders missing from checklist (now first row plus final '[' check)",
+      "subject 6 too long (replaced, 51 chars, lengths verified)"
+     ],
+     "scores": {
+      "a006": 93.5,
+      "a008": 91.0
+     },
+     "source": "judge"
     },
     {
      "id": "r2-m03",
      "a": "a007",
      "b": "a012",
+     "winner": "a007",
+     "loser": "a012",
+     "reason": "Both messages are sound and every attack was fixed or rebutted, but a007's revision handles the uncertainties more fully: a Colette surname placeholder in the body, and a neutral 'offre caf\u00e9' variant that does not assume an offer exists, with matching neutral subjects. a012's replacement ('la fa\u00e7on dont le caf\u00e9 est propos\u00e9 aujourd'hui') still assumes coffee is offered and its subjects 3/4 get no n",
+     "survived": [
+      "offre caf\u00e9 fix still presupposed an offer and ignored subjects (fixed: neutral body variant + subjects 3 bis/4 bis)",
+      "unverified domain/anti-spam claims stated as fact (fixed: [Site web, si existant], conditional wording, self-check corrected)",
+      "Colette first name only, no placeholder (fixed: Colette [Nom de famille] + point 2)",
+      "runtime clock presented as send date (fixed)",
+      "message inside Markdown blockquote (fixed: plain-text code block)",
+      "vague slot placeholders (fixed: [jour, date et heure] with verified example, Tuesday 6 Oct 2026)"
+     ],
+     "scores": {
+      "a007": 91.5,
+      "a012": 87.0
+     },
+     "source": "judge"
+    },
+    {
+     "id": "r2-m04",
+     "a": "a011",
+     "b": "a016",
+     "winner": "a011",
+     "loser": "a016",
+     "reason": "Both fixed every attack, but a011's recommended subject now situates Colette (salon within the first 40 characters) and its body gives a concrete call to action with slot placeholders and a [Fonction] slot, whereas a016's default subject still names only a bare 'Colette' without flagging that risk and its ask is vaguer; a011's extra length costs it some clarity but not enough to lose.",
+     "survived": [
+      "default subject named only Colette without context: fixed with 'Colette, rencontr\u00e9e \u00e0 South World Wines, m'a parl\u00e9 de votre mission'",
+      "'vous faire une id\u00e9e de notre machine' overstated the document: replaced with neutral 'vous trouverez ici la pr\u00e9sentation de La Reniala R1'",
+      "ambiguous parenthesis subject asserted as unambiguous: removed, and residual reading risk flagged as a judgement call in section 4"
+     ],
+     "scores": {
+      "a011": 92.5,
+      "a016": 90.5
+     },
+     "source": "judge"
+    }
+   ],
+   "bye": null,
+   "closed": true
+  },
+  {
+   "n": 3,
+   "alive": [
+    "a006",
+    "a007",
+    "a011",
+    "a014"
+   ],
+   "matches": [
+    {
+     "id": "r3-m01",
+     "a": "a006",
+     "b": "a007",
      "winner": null,
      "loser": null,
      "reason": null,
@@ -618,9 +687,9 @@
      "source": null
     },
     {
-     "id": "r2-m04",
-     "a": "a011",
-     "b": "a016",
+     "id": "r3-m02",
+     "a": "a014",
+     "b": "a011",
      "winner": null,
      "loser": null,
      "reason": null,

@@ -1,0 +1,11 @@
+{
+  "match": "r2-m04",
+  "scores": {
+    "a011": {"correctness": 9, "completeness": 10, "specificity": 9, "robustness": 10, "clarity": 7, "fatal": false},
+    "a016": {"correctness": 9, "completeness": 9, "specificity": 8, "robustness": 10, "clarity": 9, "fatal": false}
+  },
+  "winner": "a011",
+  "reason": "Both fixed every attack, but a011's recommended subject now situates Colette (salon within the first 40 characters) and its body gives a concrete call to action with slot placeholders and a [Fonction] slot, whereas a016's default subject still names only a bare 'Colette' without flagging that risk and its ask is vaguer; a011's extra length costs it some clarity but not enough to lose.",
+  "survived": ["default subject named only Colette without context: fixed with 'Colette, rencontrée à South World Wines, m'a parlé de votre mission'", "'vous faire une idée de notre machine' overstated the document: replaced with neutral 'vous trouverez ici la présentation de La Reniala R1'", "ambiguous parenthesis subject asserted as unambiguous: removed, and residual reading risk flagged as a judgement call in section 4"],
+  "standing": {"a011": [], "a016": []}
+}

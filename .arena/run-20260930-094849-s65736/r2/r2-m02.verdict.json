@@ -1,0 +1,18 @@
+{
+  "match": "r2-m02",
+  "scores": {
+    "a006": {"correctness": 9, "completeness": 10, "specificity": 9, "robustness": 10, "clarity": 8, "fatal": false},
+    "a008": {"correctness": 9, "completeness": 10, "specificity": 8, "robustness": 10, "clarity": 7, "fatal": false}
+  },
+  "winner": "a006",
+  "reason": "Both fixed every attack, but a006 puts a cleaner, send-ready message first with a simple bracketed two-slot call to action and a prominent placeholder checklist (including a final search for '['), while a008's nested optional-bracket clause '[, de [durée], [format], [période]]' plus 'Colette [Nom]' is clunky and error-prone to finalize and its diagnosis comes before the deliverable.",
+  "survived": [
+    "doubting the brief's 'offre café actuelle' (body now uses the brief's wording)",
+    "text pushing the reader away from the link (now 'parcourir à votre rythme')",
+    "default subject assuming Illan knows Colette (now hedged with subject 3 fallback)",
+    "'conçue pour' not in context (now 'dédiée aux espaces de bureau')",
+    "body time-slot placeholders missing from checklist (now first row plus final '[' check)",
+    "subject 6 too long (replaced, 51 chars, lengths verified)"
+  ],
+  "standing": {"a006": [], "a008": []}
+}

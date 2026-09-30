@@ -1,0 +1,11 @@
+{
+  "match": "r2-m01",
+  "scores": {
+    "a001": {"correctness": 7, "completeness": 9, "specificity": 9, "robustness": 7, "clarity": 7, "fatal": false},
+    "a014": {"correctness": 9, "completeness": 9, "specificity": 9, "robustness": 9, "clarity": 8, "fatal": false}
+  },
+  "winner": "a014",
+  "reason": "Both fixed every attack, but a001's fix for the no-Colette case added opening C, 'Je me permets de vous contacter en tant qu'Hospitality Manager de Have a Good Day', which reads in French as if the sender were the Hospitality Manager and gives a cold opening with no source (the flaw a014 conceded and removed), and a001 recommends that opening even when Colette simply cannot be reached; a014 ships one clean body with a single consistent subject-line rule.",
+  "survived": ["contradictory refusal branch: now says not to send and to state the real source via a placeholder", "Colette first-name-only ambiguity: [Nom de famille] placeholder plus a rule and a listed uncertainty", "inconsistent fallback subject: same rule (n°1, else n°3 or n°5) in every section"],
+  "standing": {"a001": ["no-Colette fallback (attack 4): the fix added an ambiguous, sourceless opening C that is the default when Colette cannot be reached"], "a014": []}
+}
