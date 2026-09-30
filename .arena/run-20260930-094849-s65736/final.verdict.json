@@ -1,0 +1,17 @@
+{
+  "scores": {
+    "X": {"correctness": 9, "completeness": 10, "specificity": 10, "robustness": 8, "clarity": 6, "fatal": false},
+    "Y": {"correctness": 3, "completeness": 1, "specificity": 2, "robustness": 1, "clarity": 6, "fatal": true}
+  },
+  "winner": "X",
+  "reason": "Y is the base message returned verbatim, with no Drive link, no subject lines and no rewrite, breaking hard constraints 2 and 3, while X delivers a rewritten body with the link, eight subject lines and flagged uncertainties.",
+  "fixed": [
+    "Drive presentation link integrated in the body",
+    "multiple subject lines proposed",
+    "message actually rewritten and challenged",
+    "sender, company and product (Nino MAISON, L'Arbre à Café, La Reniala R1) named from context",
+    "bracketed placeholders for missing signature details",
+    "'de la part de' misattribution to Colette corrected",
+    "uncertainties explicitly flagged (Drive access, Colette's consent, existing coffee offer)"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "match": "r4-m01",
+  "scores": {
+    "a007": {"correctness": 9, "completeness": 10, "specificity": 9, "robustness": 10, "clarity": 6, "fatal": false},
+    "a014": {"correctness": 8, "completeness": 10, "specificity": 9, "robustness": 10, "clarity": 7, "fatal": false}
+  },
+  "winner": "a007",
+  "reason": "Both fixed every attack, but a007 handles the unverified existence of a coffee offer consistently across body and subjects (neutral subjects 1-6, presupposing A/B set apart), while a014 labels subjects 3 and 5 as 'neutral' fallbacks even though they presuppose an existing coffee offer and are not adjusted by its own no-offer body variant; a007's heavier padding costs less than that.",
+  "survived": ["near-identical safe/presupposing subjects (renumbered 1-6 plus separate A/B list)", "copyable 2026-only slot example (marked as format only, with a calendar check)", "orphan '·' when removing phone/email (explicit separator rule with valid end results)"],
+  "standing": {"a007": [], "a014": []}
+}

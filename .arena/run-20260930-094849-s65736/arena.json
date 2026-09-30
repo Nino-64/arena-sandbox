@@ -170,7 +170,7 @@
      "how": "Name the real trade-offs, choose for the user's most likely constraints, and say plainly what that choice gives up."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r3/r3-m01.a007.solution.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r4/r4-m01.a007.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -338,10 +338,10 @@
      "how": "Assume the inputs are bad and the conditions are hostile. Make the answer fail safely and loudly rather than quietly."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r3/r3-m02.a014.solution.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r4/r4-m01.a014.solution.md",
+   "alive": false,
+   "eliminated_in": 4,
+   "eliminated_by": "a007",
    "byes": 0
   },
   "a015": {
@@ -728,18 +728,43 @@
      "id": "r4-m01",
      "a": "a007",
      "b": "a014",
-     "winner": null,
-     "loser": null,
-     "reason": null,
-     "survived": [],
-     "scores": null,
-     "source": null
+     "winner": "a007",
+     "loser": "a014",
+     "reason": "Both fixed every attack, but a007 handles the unverified existence of a coffee offer consistently across body and subjects (neutral subjects 1-6, presupposing A/B set apart), while a014 labels subjects 3 and 5 as 'neutral' fallbacks even though they presuppose an existing coffee offer and are not adjusted by its own no-offer body variant; a007's heavier padding costs less than that.",
+     "survived": [
+      "near-identical safe/presupposing subjects (renumbered 1-6 plus separate A/B list)",
+      "copyable 2026-only slot example (marked as format only, with a calendar check)",
+      "orphan '\u00b7' when removing phone/email (explicit separator rule with valid end results)"
+     ],
+     "scores": {
+      "a007": 91.5,
+      "a014": 89.5
+     },
+     "source": "judge"
     }
    ],
    "bye": null,
-   "closed": false
+   "closed": true
   }
  ],
- "champion": null,
- "final": null
+ "champion": "a007",
+ "final": {
+  "X": "champion",
+  "Y": "baseline",
+  "result": {
+   "better": "champion",
+   "champion_total": 89.0,
+   "baseline_total": 22.5,
+   "reason": "Y is the base message returned verbatim, with no Drive link, no subject lines and no rewrite, breaking hard constraints 2 and 3, while X delivers a rewritten body with the link, eight subject lines and flagged uncertainties.",
+   "fixed": [
+    "Drive presentation link integrated in the body",
+    "multiple subject lines proposed",
+    "message actually rewritten and challenged",
+    "sender, company and product (Nino MAISON, L'Arbre \u00e0 Caf\u00e9, La Reniala R1) named from context",
+    "bracketed placeholders for missing signature details",
+    "'de la part de' misattribution to Colette corrected",
+    "uncertainties explicitly flagged (Drive access, Colette's consent, existing coffee offer)"
+   ]
+  }
+ }
 }
