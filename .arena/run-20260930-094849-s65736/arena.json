@@ -146,10 +146,10 @@
      "how": "Be exhaustive and exact. Check every step, verify every claim, and leave no hand-waving anywhere."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r2/r2-m02.a006.solution.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r3/r3-m01.a006.solution.md",
+   "alive": false,
+   "eliminated_in": 3,
+   "eliminated_by": "a007",
    "byes": 0
   },
   "a007": {
@@ -170,7 +170,7 @@
      "how": "Name the real trade-offs, choose for the user's most likely constraints, and say plainly what that choice gives up."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r2/r2-m03.a007.solution.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r3/r3-m01.a007.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -266,10 +266,10 @@
      "how": "Optimise for how this holds up in six months: easy to maintain, easy to extend, no traps for the next person."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r2/r2-m04.a011.solution.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r3/r3-m02.a011.solution.md",
+   "alive": false,
+   "eliminated_in": 3,
+   "eliminated_by": "a014",
    "byes": 0
   },
   "a012": {
@@ -338,7 +338,7 @@
      "how": "Assume the inputs are bad and the conditions are hostile. Make the answer fail safely and loudly rather than quietly."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r2/r2-m01.a014.solution.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r3/r3-m02.a014.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -679,17 +679,55 @@
      "id": "r3-m01",
      "a": "a006",
      "b": "a007",
-     "winner": null,
-     "loser": null,
-     "reason": null,
-     "survived": [],
-     "scores": null,
-     "source": null
+     "winner": "a007",
+     "loser": "a006",
+     "reason": "Both fixed every attack, but a006 still carries flaws a007 was attacked for and fixed (removing '[Nom de famille]' as instructed leaves 'Colette , que', and the recommended subject 1 repeats the body's opening in the preview), while a007's placeholder, variant and subject guidance is fully precise, which outweighs a006's tighter length.",
+     "survived": [
+      "unscoped 'Sans cr\u00e9neaux' variant and unflagged 'dans les prochains jours' (fixed: both sentences named, no time frame)",
+      "surname removal typo 'Colette , que' (fixed: remove with preceding space, plus mandatory '[' check)",
+      "'A x B' subject implying a partnership (fixed: question form)",
+      "recommended subject duplicating the body opening (fixed: subject 3 bis carries the ask)"
+     ],
+     "scores": {
+      "a006": 91.5,
+      "a007": 93.0
+     },
+     "source": "judge"
     },
     {
      "id": "r3-m02",
      "a": "a014",
      "b": "a011",
+     "winner": "a014",
+     "loser": "a011",
+     "reason": "Both fixed every attack and invent nothing, but a014 ships a cleaner copy-ready default subject (a011's is a clunky 76-character line citing a wine fair) and more actionable scheduling guidance (a verified date example plus a working-day rule), while a011 pads with a requirements table.",
+     "survived": [
+      "signature placeholders on one line (fixed: one per line)",
+      "non-copyable Objet field (fixed: real subject in block)",
+      "subjects 2 and 4 lacking use-case (fixed: each has a case)",
+      "neutral subject presented as consent protection (fixed: reframed, risk stated)"
+     ],
+     "scores": {
+      "a014": 90.0,
+      "a011": 88.5
+     },
+     "source": "judge"
+    }
+   ],
+   "bye": null,
+   "closed": true
+  },
+  {
+   "n": 4,
+   "alive": [
+    "a007",
+    "a014"
+   ],
+   "matches": [
+    {
+     "id": "r4-m01",
+     "a": "a007",
+     "b": "a014",
      "winner": null,
      "loser": null,
      "reason": null,

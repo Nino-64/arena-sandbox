@@ -1,0 +1,11 @@
+{
+  "match": "r3-m01",
+  "scores": {
+    "a006": {"correctness": 9, "completeness": 10, "specificity": 9, "robustness": 9, "clarity": 8, "fatal": false},
+    "a007": {"correctness": 9, "completeness": 10, "specificity": 10, "robustness": 10, "clarity": 6, "fatal": false}
+  },
+  "winner": "a007",
+  "reason": "Both fixed every attack, but a006 still carries flaws a007 was attacked for and fixed (removing '[Nom de famille]' as instructed leaves 'Colette , que', and the recommended subject 1 repeats the body's opening in the preview), while a007's placeholder, variant and subject guidance is fully precise, which outweighs a006's tighter length.",
+  "survived": ["unscoped 'Sans créneaux' variant and unflagged 'dans les prochains jours' (fixed: both sentences named, no time frame)", "surname removal typo 'Colette , que' (fixed: remove with preceding space, plus mandatory '[' check)", "'A x B' subject implying a partnership (fixed: question form)", "recommended subject duplicating the body opening (fixed: subject 3 bis carries the ask)"],
+  "standing": {"a006": [], "a007": []}
+}

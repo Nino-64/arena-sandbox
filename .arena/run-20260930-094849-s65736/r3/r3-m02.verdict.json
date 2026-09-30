@@ -1,0 +1,11 @@
+{
+  "match": "r3-m02",
+  "scores": {
+    "a014": {"correctness": 9, "completeness": 9, "specificity": 9, "robustness": 10, "clarity": 7, "fatal": false},
+    "a011": {"correctness": 9, "completeness": 9, "specificity": 8, "robustness": 10, "clarity": 7, "fatal": false}
+  },
+  "winner": "a014",
+  "reason": "Both fixed every attack and invent nothing, but a014 ships a cleaner copy-ready default subject (a011's is a clunky 76-character line citing a wine fair) and more actionable scheduling guidance (a verified date example plus a working-day rule), while a011 pads with a requirements table.",
+  "survived": ["signature placeholders on one line (fixed: one per line)", "non-copyable Objet field (fixed: real subject in block)", "subjects 2 and 4 lacking use-case (fixed: each has a case)", "neutral subject presented as consent protection (fixed: reframed, risk stated)"],
+  "standing": {"a014": [], "a011": []}
+}
