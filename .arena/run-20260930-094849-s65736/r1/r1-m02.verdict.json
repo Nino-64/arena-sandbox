@@ -1,0 +1,11 @@
+{
+  "match": "r1-m02",
+  "scores": {
+    "a016": {"correctness": 9, "completeness": 10, "specificity": 9, "robustness": 10, "clarity": 9, "fatal": false},
+    "a013": {"correctness": 8, "completeness": 10, "specificity": 9, "robustness": 10, "clarity": 8, "fatal": false}
+  },
+  "winner": "a016",
+  "reason": "Both fixed every attack, but a016 is tighter and stays strictly within the context (it flags the 'La Reniala R1' naming as uncertain), while a013 asserts unverified points as fact ('le « La » fait partie du nom') and its subject 2 ('via Colette') leans toward the referral framing it removed from the body, plus some padding (unrequested follow-up).",
+  "survived": ["recommended subject implying Colette spoke of the coffee offer (replaced by 'Colette m'a parlé de votre mission chez Have a Good Day')", "inconsistent product name casing in body vs subject (now 'La Reniala R1' everywhere, with uncertainty flagged)"],
+  "standing": {"a016": [], "a013": []}
+}

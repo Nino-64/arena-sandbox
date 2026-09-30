@@ -26,7 +26,7 @@
      "how": "Be exhaustive and exact. Check every step, verify every claim, and leave no hand-waving anywhere."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r0/a001.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m03.a001.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -50,10 +50,10 @@
      "how": "Exact numbers, names, commands, file paths and steps. Zero generic advice."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r0/a002.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m07.a002.solution.md",
+   "alive": false,
+   "eliminated_in": 1,
+   "eliminated_by": "a012",
    "byes": 0
   },
   "a003": {
@@ -74,10 +74,10 @@
      "how": "Pick the least complicated answer that fully does the job. Every extra part has to justify itself."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r0/a003.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m01.a003.solution.md",
+   "alive": false,
+   "eliminated_in": 1,
+   "eliminated_by": "a007",
    "byes": 0
   },
   "a004": {
@@ -98,10 +98,10 @@
      "how": "Hunt the edge cases, failure modes and weird inputs first, and design the answer around surviving them."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r0/a004.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m04.a004.solution.md",
+   "alive": false,
+   "eliminated_in": 1,
+   "eliminated_by": "a014",
    "byes": 0
   },
   "a005": {
@@ -122,10 +122,10 @@
      "how": "Optimise for the fastest route to something usable today. Cut anything that does not move the result."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r0/a005.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m08.a005.solution.md",
+   "alive": false,
+   "eliminated_in": 1,
+   "eliminated_by": "a006",
    "byes": 0
   },
   "a006": {
@@ -146,7 +146,7 @@
      "how": "Be exhaustive and exact. Check every step, verify every claim, and leave no hand-waving anywhere."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r0/a006.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m08.a006.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -170,7 +170,7 @@
      "how": "Name the real trade-offs, choose for the user's most likely constraints, and say plainly what that choice gives up."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r0/a007.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m01.a007.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -194,7 +194,7 @@
      "how": "Pick the least complicated answer that fully does the job. Every extra part has to justify itself."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r0/a008.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m06.a008.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -218,10 +218,10 @@
      "how": "Make it the easiest answer to read and act on: plain words, obvious structure, nothing the reader has to decode."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r0/a009.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m03.a009.solution.md",
+   "alive": false,
+   "eliminated_in": 1,
+   "eliminated_by": "a001",
    "byes": 0
   },
   "a010": {
@@ -242,10 +242,10 @@
      "how": "Start from the person who will use this: their situation, their skill level, and what they will actually do next. Shape everything around that."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r0/a010.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m05.a010.solution.md",
+   "alive": false,
+   "eliminated_in": 1,
+   "eliminated_by": "a011",
    "byes": 0
   },
   "a011": {
@@ -266,7 +266,7 @@
      "how": "Optimise for how this holds up in six months: easy to maintain, easy to extend, no traps for the next person."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r0/a011.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m05.a011.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -290,7 +290,7 @@
      "how": "Leave out nothing the task asks for or clearly implies. Cover every requirement explicitly."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r0/a012.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m07.a012.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -314,10 +314,10 @@
      "how": "Assume the inputs are bad and the conditions are hostile. Make the answer fail safely and loudly rather than quietly."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r0/a013.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m02.a013.solution.md",
+   "alive": false,
+   "eliminated_in": 1,
+   "eliminated_by": "a016",
    "byes": 0
   },
   "a014": {
@@ -338,7 +338,7 @@
      "how": "Assume the inputs are bad and the conditions are hostile. Make the answer fail safely and loudly rather than quietly."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r0/a014.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m04.a014.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -362,10 +362,10 @@
      "how": "Remove things until it breaks, then put the last one back. Fewer steps, fewer dependencies, fewer words."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r0/a015.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m06.a015.solution.md",
+   "alive": false,
+   "eliminated_in": 1,
+   "eliminated_by": "a008",
    "byes": 0
   },
   "a016": {
@@ -386,7 +386,7 @@
      "how": "Remove things until it breaks, then put the last one back. Fewer steps, fewer dependencies, fewer words."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r0/a016.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20260930-094849-s65736/r1/r1-m02.a016.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -419,72 +419,175 @@
      "id": "r1-m01",
      "a": "a003",
      "b": "a007",
-     "winner": null,
-     "loser": null,
-     "reason": null,
-     "survived": [],
-     "scores": null,
-     "source": null
+     "winner": "a007",
+     "loser": "a003",
+     "reason": "Both fixed every attack, but a003's recommended subject 'Colette m'a parl\u00e9 de vous : votre offre caf\u00e9 chez Have a Good Day' again juxtaposes Colette with the coffee offer (the implication a003 itself attacked), whereas a007's recommended subject and body stay strictly within the context; a007's extra length costs clarity but not enough to offset it.",
+     "survived": [
+      "recommended subject implying Colette's employer / coffee-offer discussion (replaced with context-exact wording)",
+      "product name lowercased to 'la Reniala R1' (now 'La Reniala R1' throughout)",
+      "phone/visio format unflagged (now listed as assumption)",
+      "'un seul lien' anti-spam claim contradicted by signature (reworded to body-only, flagged as unverified)",
+      "unsupported inference that names came from Colette and unlabelled year (removed; year stated as checked inference)"
+     ],
+     "scores": {
+      "a003": 87.0,
+      "a007": 89.0
+     },
+     "source": "judge"
     },
     {
      "id": "r1-m02",
      "a": "a016",
      "b": "a013",
-     "winner": null,
-     "loser": null,
-     "reason": null,
-     "survived": [],
-     "scores": null,
-     "source": null
+     "winner": "a016",
+     "loser": "a013",
+     "reason": "Both fixed every attack, but a016 is tighter and stays strictly within the context (it flags the 'La Reniala R1' naming as uncertain), while a013 asserts unverified points as fact ('le \u00ab La \u00bb fait partie du nom') and its subject 2 ('via Colette') leans toward the referral framing it removed from the body, plus some padding (unrequested follow-up).",
+     "survived": [
+      "recommended subject implying Colette spoke of the coffee offer (replaced by 'Colette m'a parl\u00e9 de votre mission chez Have a Good Day')",
+      "inconsistent product name casing in body vs subject (now 'La Reniala R1' everywhere, with uncertainty flagged)"
+     ],
+     "scores": {
+      "a016": 94.5,
+      "a013": 90.5
+     },
+     "source": "judge"
     },
     {
      "id": "r1-m03",
      "a": "a009",
      "b": "a001",
-     "winner": null,
-     "loser": null,
-     "reason": null,
-     "survived": [],
-     "scores": null,
-     "source": null
+     "winner": "a001",
+     "loser": "a009",
+     "reason": "Both revised messages are faithful to the context and fixed every attack. a001 meets constraint 4 more fully: it explicitly flags the unread Drive content, the unconfirmed 'machine \u00e0 caf\u00e9' wording, the Illan assumptions and the 'de la part de' condition. It also keeps the exact product name 'La Reniala R1', while a009 flags fewer uncertainties.",
+     "survived": [
+      "invented 'machine \u00e0 caf\u00e9 / caf\u00e9 de sp\u00e9cialit\u00e9' claims in body and subjects 5-6 (fixed)",
+      "invented '20 minutes' figure and sample date in slots (fixed)",
+      "false dangling-participle grammar claim (removed)",
+      "inconsistent Colette consent rule and misreading of 'Recommandation' (unified, corrected)",
+      "mixed signal 'avant de vous la pr\u00e9senter' then giving the link (rewritten)"
+     ],
+     "scores": {
+      "a009": 92.0,
+      "a001": 93.5
+     },
+     "source": "judge"
     },
     {
      "id": "r1-m04",
      "a": "a014",
      "b": "a004",
-     "winner": null,
-     "loser": null,
-     "reason": null,
-     "survived": [],
-     "scores": null,
-     "source": null
+     "winner": "a014",
+     "loser": "a004",
+     "reason": "Both fixed every attack, but a014's revision is clean on verification (example slots 8 and 13 October are correctly the 6th and 9th business days, subject 1 is made conditional on Colette's consent), while a004 still has a false factual claim (2026 is not the only recent year when 21 September is a Monday, 2020 was too) and puts its salon-name subject first without tying it to Colette's consent.",
+     "survived": [
+      "'Suite au salon' subject implying Illan was at the salon: replaced and warned against",
+      "Colette subject recommended without consent condition: now conditional, with fallback subjects 3/5 and a body fallback",
+      "example slots breaking the 5-10 business day rule: recomputed correctly and marked illustrative",
+      "unverified claim that a bare URL is always clickable: reworded and flagged"
+     ],
+     "scores": {
+      "a014": 93.5,
+      "a004": 88.5
+     },
+     "source": "judge"
     },
     {
      "id": "r1-m05",
      "a": "a011",
      "b": "a010",
-     "winner": null,
-     "loser": null,
-     "reason": null,
-     "survived": [],
-     "scores": null,
-     "source": null
+     "winner": "a011",
+     "loser": "a010",
+     "reason": "Both fixed every attack, but a010's revised body still says \u00ab Avant de vous parler de notre machine \u00bb right after naming La Reniala R1 (the same contradiction it attacked a011 for), repeats L'Arbre \u00e0 Caf\u00e9 twice in two sentences and changes the given name to \u00ab Nino Maison \u00bb, while a011's body is consistent and keeps every given name exactly.",
+     "survived": [
+      "subject 2 \u00ab de la part de Colette \u00bb / salon implication: replaced with a factual subject",
+      "\u00ab Avant de parler de notre machine \u00bb contradiction: sentence removed",
+      "wrong instruction for removing time slots: corrected",
+      "unverified claim that the URL is clickable everywhere: rewritten and flagged as an uncertainty",
+      "subject 3 assuming an existing coffee offer: made neutral and covered in the caveat"
+     ],
+     "scores": {
+      "a011": 93.5,
+      "a010": 90.5
+     },
+     "source": "judge"
     },
     {
      "id": "r1-m06",
      "a": "a008",
      "b": "a015",
-     "winner": null,
-     "loser": null,
-     "reason": null,
-     "survived": [],
-     "scores": null,
-     "source": null
+     "winner": "a008",
+     "loser": "a015",
+     "reason": "Both messages are sound and both fixed every attack, but a015's revised word-count claim still does not match its own stated method (a plain whitespace count gives 86 vs 95, not 84 vs 94), while a008 has no verifiable slip and offers a wider, fully flagged set of subject lines.",
+     "survived": [
+      "subject 2 asserting an unverified coffee offer: reworded as an invitation",
+      "subject 5 'L'Arbre a Cafe x Have a Good Day' implying a partnership: replaced with a factual product subject"
+     ],
+     "scores": {
+      "a008": 93.5,
+      "a015": 89.5
+     },
+     "source": "judge"
     },
     {
      "id": "r1-m07",
      "a": "a012",
      "b": "a002",
+     "winner": "a012",
+     "loser": "a002",
+     "reason": "Both revisions fixed every attack and stay within the facts, but a012 delivers the body as a clean plain-text block that pastes directly and adds a useful redirect line, while a002's body is still in Markdown blockquote markers that must be stripped before sending.",
+     "survived": [
+      "'de la part de' attribution: removed from default body and subject, kept only as a flagged variant",
+      "invented 'Colette m'a conseill\u00e9' subject: replaced with context wording",
+      "contradiction after the link: now 'Au-del\u00e0 de ce document'",
+      "copy-ready block with Objet and '>' markup: now a separate plain-text code block",
+      "'A \u00d7 B' subject implying partnership: replaced"
+     ],
+     "scores": {
+      "a012": 94.5,
+      "a002": 93.5
+     },
+     "source": "judge"
+    },
+    {
+     "id": "r1-m08",
+     "a": "a005",
+     "b": "a006",
+     "winner": "a006",
+     "loser": "a005",
+     "reason": "Both fixed every attack, but a005 still offers subject 5 'La Reniala R1 : une machine de caf\u00e9 de sp\u00e9cialit\u00e9 d\u00e9di\u00e9e aux bureaux', which gives the machine a specialty-coffee feature the context never states (constraint 1). a005 does not flag it, and its section 3 says nothing was added. a006's revised subjects and body stay within the context throughout.",
+     "survived": [
+      "subject 6 'sur recommandation de Colette' overstating the introduction: replaced with the factual wording, and the uncertainty table now flags when the 'recommandation' framing may be used",
+      "unbracketed '15 minutes' figure in subject 3: removed",
+      "spam workaround that dropped the link from the body and assumed a PDF format: removed; the link now stays in the body",
+      "subject 4 attributing specialty coffee to La Reniala R1: replaced with the context's wording"
+     ],
+     "scores": {
+      "a005": 78.0,
+      "a006": 93.5
+     },
+     "source": "judge"
+    }
+   ],
+   "bye": null,
+   "closed": true
+  },
+  {
+   "n": 2,
+   "alive": [
+    "a001",
+    "a006",
+    "a007",
+    "a008",
+    "a011",
+    "a012",
+    "a014",
+    "a016"
+   ],
+   "matches": [
+    {
+     "id": "r2-m01",
+     "a": "a001",
+     "b": "a014",
      "winner": null,
      "loser": null,
      "reason": null,
@@ -493,9 +596,31 @@
      "source": null
     },
     {
-     "id": "r1-m08",
-     "a": "a005",
-     "b": "a006",
+     "id": "r2-m02",
+     "a": "a006",
+     "b": "a008",
+     "winner": null,
+     "loser": null,
+     "reason": null,
+     "survived": [],
+     "scores": null,
+     "source": null
+    },
+    {
+     "id": "r2-m03",
+     "a": "a007",
+     "b": "a012",
+     "winner": null,
+     "loser": null,
+     "reason": null,
+     "survived": [],
+     "scores": null,
+     "source": null
+    },
+    {
+     "id": "r2-m04",
+     "a": "a011",
+     "b": "a016",
      "winner": null,
      "loser": null,
      "reason": null,

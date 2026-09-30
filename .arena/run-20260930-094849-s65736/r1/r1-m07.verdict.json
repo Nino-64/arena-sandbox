@@ -1,0 +1,11 @@
+{
+  "match": "r1-m07",
+  "scores": {
+    "a012": {"correctness": 9, "completeness": 10, "specificity": 9, "robustness": 10, "clarity": 9, "fatal": false},
+    "a002": {"correctness": 9, "completeness": 10, "specificity": 9, "robustness": 10, "clarity": 8, "fatal": false}
+  },
+  "winner": "a012",
+  "reason": "Both revisions fixed every attack and stay within the facts, but a012 delivers the body as a clean plain-text block that pastes directly and adds a useful redirect line, while a002's body is still in Markdown blockquote markers that must be stripped before sending.",
+  "survived": ["'de la part de' attribution: removed from default body and subject, kept only as a flagged variant", "invented 'Colette m'a conseillé' subject: replaced with context wording", "contradiction after the link: now 'Au-delà de ce document'", "copy-ready block with Objet and '>' markup: now a separate plain-text code block", "'A × B' subject implying partnership: replaced"],
+  "standing": {"a012": [], "a002": []}
+}

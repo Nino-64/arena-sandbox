@@ -1,0 +1,19 @@
+{
+  "match": "r1-m08",
+  "scores": {
+    "a005": {"correctness": 6, "completeness": 9, "specificity": 9, "robustness": 8, "clarity": 8, "fatal": false},
+    "a006": {"correctness": 9, "completeness": 10, "specificity": 9, "robustness": 10, "clarity": 8, "fatal": false}
+  },
+  "winner": "a006",
+  "reason": "Both fixed every attack, but a005 still offers subject 5 'La Reniala R1 : une machine de café de spécialité dédiée aux bureaux', which gives the machine a specialty-coffee feature the context never states (constraint 1). a005 does not flag it, and its section 3 says nothing was added. a006's revised subjects and body stay within the context throughout.",
+  "survived": [
+    "subject 6 'sur recommandation de Colette' overstating the introduction: replaced with the factual wording, and the uncertainty table now flags when the 'recommandation' framing may be used",
+    "unbracketed '15 minutes' figure in subject 3: removed",
+    "spam workaround that dropped the link from the body and assumed a PDF format: removed; the link now stays in the body",
+    "subject 4 attributing specialty coffee to La Reniala R1: replaced with the context's wording"
+  ],
+  "standing": {
+    "a005": [],
+    "a006": []
+  }
+}

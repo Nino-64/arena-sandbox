@@ -1,0 +1,11 @@
+{
+  "match": "r1-m04",
+  "scores": {
+    "a014": {"correctness": 9, "completeness": 10, "specificity": 9, "robustness": 10, "clarity": 8, "fatal": false},
+    "a004": {"correctness": 8, "completeness": 10, "specificity": 9, "robustness": 9, "clarity": 8, "fatal": false}
+  },
+  "winner": "a014",
+  "reason": "Both fixed every attack, but a014's revision is clean on verification (example slots 8 and 13 October are correctly the 6th and 9th business days, subject 1 is made conditional on Colette's consent), while a004 still has a false factual claim (2026 is not the only recent year when 21 September is a Monday, 2020 was too) and puts its salon-name subject first without tying it to Colette's consent.",
+  "survived": ["'Suite au salon' subject implying Illan was at the salon: replaced and warned against", "Colette subject recommended without consent condition: now conditional, with fallback subjects 3/5 and a body fallback", "example slots breaking the 5-10 business day rule: recomputed correctly and marked illustrative", "unverified claim that a bare URL is always clickable: reworded and flagged"],
+  "standing": {"a014": [], "a004": []}
+}

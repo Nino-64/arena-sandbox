@@ -1,0 +1,11 @@
+{
+  "match": "r1-m01",
+  "scores": {
+    "a003": {"correctness": 8, "completeness": 9, "specificity": 9, "robustness": 9, "clarity": 9, "fatal": false},
+    "a007": {"correctness": 9, "completeness": 9, "specificity": 9, "robustness": 10, "clarity": 6, "fatal": false}
+  },
+  "winner": "a007",
+  "reason": "Both fixed every attack, but a003's recommended subject 'Colette m'a parlé de vous : votre offre café chez Have a Good Day' again juxtaposes Colette with the coffee offer (the implication a003 itself attacked), whereas a007's recommended subject and body stay strictly within the context; a007's extra length costs clarity but not enough to offset it.",
+  "survived": ["recommended subject implying Colette's employer / coffee-offer discussion (replaced with context-exact wording)", "product name lowercased to 'la Reniala R1' (now 'La Reniala R1' throughout)", "phone/visio format unflagged (now listed as assumption)", "'un seul lien' anti-spam claim contradicted by signature (reworded to body-only, flagged as unverified)", "unsupported inference that names came from Colette and unlabelled year (removed; year stated as checked inference)"],
+  "standing": {"a003": ["new minor issue: recommended subject 1 pairs 'Colette m'a parlé de vous' with 'votre offre café', hinting Colette discussed his coffee offer"], "a007": []}
+}

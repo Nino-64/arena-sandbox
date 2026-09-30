@@ -1,0 +1,11 @@
+{
+  "match": "r1-m05",
+  "scores": {
+    "a011": {"correctness": 9, "completeness": 10, "specificity": 9, "robustness": 10, "clarity": 8, "fatal": false},
+    "a010": {"correctness": 8, "completeness": 10, "specificity": 9, "robustness": 10, "clarity": 8, "fatal": false}
+  },
+  "winner": "a011",
+  "reason": "Both fixed every attack, but a010's revised body still says « Avant de vous parler de notre machine » right after naming La Reniala R1 (the same contradiction it attacked a011 for), repeats L'Arbre à Café twice in two sentences and changes the given name to « Nino Maison », while a011's body is consistent and keeps every given name exactly.",
+  "survived": ["subject 2 « de la part de Colette » / salon implication: replaced with a factual subject", "« Avant de parler de notre machine » contradiction: sentence removed", "wrong instruction for removing time slots: corrected", "unverified claim that the URL is clickable everywhere: rewritten and flagged as an uncertainty", "subject 3 assuming an existing coffee offer: made neutral and covered in the caveat"],
+  "standing": {"a011": [], "a010": []}
+}

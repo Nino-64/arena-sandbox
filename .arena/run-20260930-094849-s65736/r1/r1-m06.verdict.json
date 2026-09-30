@@ -1,0 +1,11 @@
+{
+  "match": "r1-m06",
+  "scores": {
+    "a008": {"correctness": 9, "completeness": 10, "specificity": 9, "robustness": 10, "clarity": 8, "fatal": false},
+    "a015": {"correctness": 8, "completeness": 10, "specificity": 9, "robustness": 9, "clarity": 9, "fatal": false}
+  },
+  "winner": "a008",
+  "reason": "Both messages are sound and both fixed every attack, but a015's revised word-count claim still does not match its own stated method (a plain whitespace count gives 86 vs 95, not 84 vs 94), while a008 has no verifiable slip and offers a wider, fully flagged set of subject lines.",
+  "survived": ["subject 2 asserting an unverified coffee offer: reworded as an invitation", "subject 5 'L'Arbre a Cafe x Have a Good Day' implying a partnership: replaced with a factual product subject"],
+  "standing": {"a008": [], "a015": ["word-count claim still inexact under its own stated counting method (partial fix)"]}
+}

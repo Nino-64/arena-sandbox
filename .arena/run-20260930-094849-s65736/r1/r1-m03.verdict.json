@@ -1,0 +1,11 @@
+{
+  "match": "r1-m03",
+  "scores": {
+    "a009": {"correctness": 9, "completeness": 9, "specificity": 9, "robustness": 10, "clarity": 9, "fatal": false},
+    "a001": {"correctness": 9, "completeness": 10, "specificity": 9, "robustness": 10, "clarity": 8, "fatal": false}
+  },
+  "winner": "a001",
+  "reason": "Both revised messages are faithful to the context and fixed every attack. a001 meets constraint 4 more fully: it explicitly flags the unread Drive content, the unconfirmed 'machine à café' wording, the Illan assumptions and the 'de la part de' condition. It also keeps the exact product name 'La Reniala R1', while a009 flags fewer uncertainties.",
+  "survived": ["invented 'machine à café / café de spécialité' claims in body and subjects 5-6 (fixed)", "invented '20 minutes' figure and sample date in slots (fixed)", "false dangling-participle grammar claim (removed)", "inconsistent Colette consent rule and misreading of 'Recommandation' (unified, corrected)", "mixed signal 'avant de vous la présenter' then giving the link (rewritten)"],
+  "standing": {"a009": [], "a001": []}
+}
