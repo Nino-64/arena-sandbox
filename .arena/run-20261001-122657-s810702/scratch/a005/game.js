@@ -1,0 +1,1401 @@
+
+(() => {
+'use strict';
+
+/* =====================================================================
+   0. Fail loudly: any uncaught error stops the loop and shows a panel.
+   ===================================================================== */
+let halted = false;
+function fatal(err) {
+  if (halted) return;
+  halted = true;
+  const msg = (err && (err.stack || err.message)) || String(err);
+  console.error('[Orbital] fatal:', err);
+  try { Sound.stopMusic(); } catch (_) { /* audio is optional */ }
+  const box = document.getElementById('fatal');
+  const pre = document.getElementById('fatalMsg');
+  if (pre) pre.textContent = msg.slice(0, 2000);
+  if (box) {
+    document.querySelectorAll('.screen.show').forEach(s => s.classList.remove('show'));
+    box.classList.add('show');
+    const b = document.getElementById('btnReload');
+    if (b) { b.onclick = () => location.reload(); b.focus(); }
+  } else {
+    alert('Orbital crashed: ' + msg);
+  }
+}
+window.addEventListener('error', e => {
+  // Ignore errors thrown by browser extensions; anything from this page is fatal.
+  if (e.filename && /^(chrome|moz|safari)-extension:/.test(e.filename)) return;
+  fatal(e.error || e.message);
+});
+window.addEventListener('unhandledrejection', e => fatal(e.reason));
+
+const $ = id => {
+  const el = document.getElementById(id);
+  if (!el) throw new Error('Missing UI element #' + id);
+  return el;
+};
+
+/* =====================================================================
+   1. Constants & helpers
+   ===================================================================== */
+const TAU = Math.PI * 2;
+const R = 150;              // orbit radius, world units
+const VIEW = 240;           // world units from centre to the nearest screen edge
+const STEP = 1 / 120;       // fixed simulation step (s)
+const COMBO_TIME = 3.0;     // seconds before a shard chain breaks
+const PLAYER_HIT_R = 6;     // forgiving hitbox (visual radius is ~9)
+const GEM_PICK_R = 19;
+const MAX_INT = 1e9;
+const FONT = 'ui-rounded,"SF Pro Rounded","Segoe UI",system-ui,-apple-system,sans-serif';
+
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const rand = (a, b) => a + Math.random() * (b - a);
+const angDiff = (a, b) => { let d = (a - b) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return d; };
+const fmt = n => Math.floor(n).toLocaleString('en-US');
+const prefersReduced = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } })();
+
+/* =====================================================================
+   2. Unlockables & progression
+   ===================================================================== */
+const SKINS = [
+  { id: 'ion',     name: 'Ion',     color: '#5ee7ff', trail: '#2bb8ff', req: null },
+  { id: 'ember',   name: 'Ember',   color: '#ffb35e', trail: '#ff6a3d', req: { type: 'best', n: 1500 } },
+  { id: 'verdant', name: 'Verdant', color: '#7dffb0', trail: '#22d982', req: { type: 'gems', n: 150 } },
+  { id: 'nova',    name: 'Nova',    color: '#ff7ad9', trail: '#ff3fa4', req: { type: 'mult', n: 5 } },
+  { id: 'aurum',   name: 'Aurum',   color: '#ffe27a', trail: '#ffb020', req: { type: 'runs', n: 40 } },
+  { id: 'void',    name: 'Void',    color: '#c3b0ff', trail: '#7a5cff', req: { type: 'best', n: 5000 } },
+  { id: 'prism',   name: 'Prism',   color: '#ffffff', trail: 'rainbow', req: { type: 'best', n: 12000 } },
+];
+const reqValue = (s, d) => !s.req ? 0 : ({ best: d.best, gems: d.totalGems, mult: d.maxMult, runs: d.runs })[s.req.type] || 0;
+const isUnlocked = (s, d) => !s.req || reqValue(s, d) >= s.req.n;
+function reqText(s) {
+  if (!s.req) return 'Standard issue';
+  const n = fmt(s.req.n);
+  switch (s.req.type) {
+    case 'best': return `Score ${n} in one run`;
+    case 'gems': return `Collect ${n} shards total`;
+    case 'mult': return `Reach a x${n} multiplier`;
+    case 'runs': return `Play ${n} runs`;
+    default: return 'Locked';
+  }
+}
+const unlockedIds = d => new Set(SKINS.filter(s => isUnlocked(s, d)).map(s => s.id));
+
+const RANK_MAX = 99;
+const xpFor = r => 400 * (r - 1) * (r - 1);
+const rankOf = xp => Math.min(RANK_MAX, Math.floor(Math.sqrt(Math.max(0, xp) / 400)) + 1);
+function rankProgress(xp) {
+  const r = rankOf(xp);
+  if (r >= RANK_MAX) return 1;
+  return clamp((xp - xpFor(r)) / (xpFor(r + 1) - xpFor(r)), 0, 1);
+}
+
+/* =====================================================================
+   3. Save system (localStorage) – validated, versioned, never trusted
+   ===================================================================== */
+const SAVE_KEY = 'orbital.save';
+const SAVE_VERSION = 1;
+const defaultSave = () => ({
+  v: SAVE_VERSION, best: 0, bestTime: 0, totalGems: 0, runs: 0, xp: 0, maxMult: 1, skin: 'ion',
+  settings: { sfx: true, music: true, volume: 0.7, shake: prefersReduced ? 0.3 : 1 },
+});
+
+function sanitize(p) {
+  const d = defaultSave();
+  if (!p || typeof p !== 'object' || Array.isArray(p)) return { save: d, repaired: true };
+  let repaired = false;
+  const num = (v, min, max, def, int = true) => {
+    if (typeof v !== 'number' || !Number.isFinite(v)) { repaired = true; return def; }
+    let x = clamp(v, min, max); if (int) x = Math.floor(x);
+    if (x !== v) repaired = true;
+    return x;
+  };
+  const bool = (v, def) => { if (typeof v === 'boolean') return v; repaired = true; return def; };
+  const ps = p.settings && typeof p.settings === 'object' && !Array.isArray(p.settings) ? p.settings : (repaired = true, {});
+  let skin = p.skin;
+  if (typeof skin !== 'string' || !SKINS.some(s => s.id === skin)) { repaired = true; skin = 'ion'; }
+  const save = {
+    v: SAVE_VERSION,
+    best: num(p.best, 0, MAX_INT, 0),
+    bestTime: num(p.bestTime, 0, 1e7, 0, false),
+    totalGems: num(p.totalGems, 0, MAX_INT, 0),
+    runs: num(p.runs, 0, MAX_INT, 0),
+    xp: num(p.xp, 0, MAX_INT, 0),
+    maxMult: num(p.maxMult, 1, 8, 1),
+    skin,
+    settings: {
+      sfx: bool(ps.sfx, d.settings.sfx),
+      music: bool(ps.music, d.settings.music),
+      volume: num(ps.volume, 0, 1, d.settings.volume, false),
+      shake: num(ps.shake, 0, 1, d.settings.shake, false),
+    },
+  };
+  return { save, repaired };
+}
+
+const Store = {
+  writable: true,
+  reason: '',
+  data: defaultSave(),
+  load() {
+    let raw = null;
+    try {
+      const k = '__orbital_probe__';
+      localStorage.setItem(k, '1'); localStorage.removeItem(k);
+      raw = localStorage.getItem(SAVE_KEY);
+    } catch (e) {
+      this.writable = false;
+      this.reason = 'Storage is blocked in this browser mode, so progress lasts only until you close the tab.';
+      return 'unavailable';
+    }
+    if (raw === null) return 'new';
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch (e) {
+      try { localStorage.setItem(SAVE_KEY + '.corrupt', raw.slice(0, 100000)); } catch (_) { /* best effort */ }
+      return 'corrupt';
+    }
+    if (parsed && typeof parsed.v === 'number' && parsed.v > SAVE_VERSION) {
+      // A newer build wrote this save. Read what we understand but never overwrite it.
+      this.writable = false;
+      this.reason = 'This save came from a newer version of Orbital. It was loaded read-only so it is not overwritten.';
+      this.data = sanitize(parsed).save;
+      return 'newer';
+    }
+    const { save, repaired } = sanitize(parsed);
+    this.data = save;
+    return repaired ? 'repaired' : 'ok';
+  },
+  commit() {
+    if (!this.writable) return false;
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(this.data));
+      return true;
+    } catch (e) {
+      this.writable = false;
+      this.reason = 'Saving failed (storage full or blocked). Progress from now on will not be kept.';
+      toast(this.reason, 'warn', 5000);
+      UI.refreshStoreNote();
+      return false;
+    }
+  },
+  reset() {
+    const settings = this.data.settings;
+    this.data = defaultSave();
+    this.data.settings = settings;
+    this.commit();
+  },
+};
+const save = () => Store.data;
+
+/* =====================================================================
+   4. Procedural audio (Web Audio API). Optional: failures never stop play.
+   ===================================================================== */
+const Sound = (() => {
+  let ctx = null, master, comp, sfxBus, musBus, musFilter, noiseBuf;
+  let failed = false, warned = false;
+  const mus = { on: false, timer: 0, next: 0, step: 0, intensity: 0 };
+
+  function init() {
+    if (ctx || failed) return !!ctx;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) { failed = true; return false; }
+    try {
+      ctx = new AC();
+      comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -16; comp.knee.value = 10; comp.ratio.value = 4;
+      master = ctx.createGain();
+      sfxBus = ctx.createGain();
+      musBus = ctx.createGain();
+      musFilter = ctx.createBiquadFilter();
+      musFilter.type = 'lowpass'; musFilter.frequency.value = 900; musFilter.Q.value = 0.7;
+      sfxBus.connect(master);
+      musBus.connect(musFilter); musFilter.connect(master);
+      master.connect(comp); comp.connect(ctx.destination);
+      const len = Math.floor(ctx.sampleRate * 1.0);
+      noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const ch = noiseBuf.getChannelData(0);
+      for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1;
+      apply();
+      return true;
+    } catch (e) {
+      failed = true; ctx = null;
+      console.warn('[Orbital] Audio disabled:', e);
+      return false;
+    }
+  }
+  function unlock() {
+    if (!init()) return;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+  }
+  function suspend() { if (ctx && ctx.state === 'running') ctx.suspend().catch(() => {}); }
+  function apply() {
+    if (!ctx) return;
+    const s = save().settings, t = ctx.currentTime;
+    master.gain.setTargetAtTime(s.volume * s.volume * 0.9, t, 0.02);
+    sfxBus.gain.setTargetAtTime(s.sfx ? 1 : 0, t, 0.02);
+    musBus.gain.setTargetAtTime(s.music ? 0.5 : 0, t, 0.05);
+  }
+  const guard = fn => (...a) => {
+    if (!ctx || ctx.state !== 'running') return;
+    try { fn(...a); } catch (e) { if (!warned) { warned = true; console.warn('[Orbital] SFX error:', e); } }
+  };
+  function tone(f, dur, o = {}) {
+    const t = o.t != null ? o.t : ctx.currentTime + (o.at || 0);
+    const osc = ctx.createOscillator(), g = ctx.createGain();
+    osc.type = o.type || 'sine';
+    osc.frequency.setValueAtTime(f, t);
+    if (o.f2) osc.frequency.exponentialRampToValueAtTime(Math.max(1, o.f2), t + dur);
+    if (o.detune) osc.detune.value = o.detune;
+    const vol = o.vol || 0.2, a = o.attack || 0.004;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + a);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(g); g.connect(o.bus || sfxBus);
+    osc.start(t); osc.stop(t + dur + 0.05);
+  }
+  function noise(dur, o = {}) {
+    const t = o.t != null ? o.t : ctx.currentTime + (o.at || 0);
+    const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    src.buffer = noiseBuf;
+    f.type = o.type || 'bandpass';
+    f.frequency.setValueAtTime(o.f || 1200, t);
+    if (o.f2) f.frequency.exponentialRampToValueAtTime(Math.max(20, o.f2), t + dur);
+    f.Q.value = o.q || 0.8;
+    const vol = o.vol || 0.2;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + (o.attack || 0.005));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(o.bus || sfxBus);
+    src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.05);
+  }
+  const PENTA = [0, 2, 4, 7, 9];
+  const sfx = {
+    flip: guard(() => { tone(460, 0.09, { f2: 300, type: 'triangle', vol: 0.11 }); noise(0.08, { type: 'highpass', f: 3500, f2: 1200, vol: 0.045 }); }),
+    gem: guard(combo => {
+      const i = Math.min(combo, 14);
+      const semis = PENTA[i % 5] + 12 * Math.floor(i / 5);
+      const f = 523.25 * Math.pow(2, semis / 12);
+      tone(f, 0.2, { type: 'triangle', vol: 0.17 });
+      tone(f * 2, 0.14, { type: 'sine', vol: 0.06, at: 0.025 });
+    }),
+    mult: guard(m => {
+      const base = 392 * Math.pow(2, Math.min(m, 8) / 12);
+      [0, 4, 7, 12].forEach((s, k) => tone(base * Math.pow(2, s / 12), 0.16, { type: 'square', vol: 0.05, at: k * 0.045 }));
+    }),
+    near: guard(() => { tone(820, 0.14, { f2: 1750, vol: 0.08 }); noise(0.12, { type: 'highpass', f: 5000, vol: 0.04 }); }),
+    thread: guard(() => { tone(660, 0.16, { type: 'triangle', vol: 0.12 }); tone(990, 0.22, { type: 'triangle', vol: 0.1, at: 0.07 }); }),
+    power: guard(() => { [0, 5, 9, 12, 17].forEach((s, k) => tone(440 * Math.pow(2, s / 12), 0.14, { type: 'square', vol: 0.045, at: k * 0.04 })); }),
+    shield: guard(() => { tone(320, 0.35, { f2: 70, type: 'square', vol: 0.1 }); noise(0.3, { type: 'lowpass', f: 3000, f2: 250, vol: 0.22 }); }),
+    pulse: guard(() => { tone(120, 0.5, { f2: 60, vol: 0.18 }); }),
+    comboLost: guard(() => { tone(330, 0.28, { f2: 170, type: 'triangle', vol: 0.07 }); }),
+    death: guard(() => {
+      noise(1.0, { type: 'lowpass', f: 5000, f2: 70, vol: 0.55, q: 1.2 });
+      tone(170, 0.9, { f2: 32, vol: 0.5 });
+      tone(95, 0.7, { f2: 28, type: 'sawtooth', vol: 0.1 });
+    }),
+    fanfare: guard(() => { [0, 4, 7, 12, 16].forEach((s, k) => tone(523.25 * Math.pow(2, s / 12), 0.3, { type: 'triangle', vol: 0.11, at: k * 0.08 })); }),
+    ui: guard(() => { tone(900, 0.05, { vol: 0.05 }); }),
+    start: guard(() => { tone(220, 0.35, { f2: 880, type: 'triangle', vol: 0.1 }); noise(0.3, { type: 'bandpass', f: 600, f2: 4000, vol: 0.06 }); }),
+  };
+
+  /* ---- Music: lookahead scheduler, tempo & filter follow intensity ---- */
+  const CHORDS = [[0, 3, 7], [-4, 0, 3], [3, 7, 10], [-2, 2, 5]]; // Am F C G (semitones from A)
+  const ARP = [0, 1, 2, 3, 2, 1, 0, 2, 0, 1, 2, 3, 2, 3, 1, 2];
+  function playStep(step, t, spb) {
+    const bar = Math.floor(step / 16) % 4, s = step % 16, ch = CHORDS[bar];
+    const I = mus.intensity, bus = musBus;
+    if (s === 0 || s === 8 || (I > 0.45 && (s === 4 || s === 12))) tone(150, 0.22, { f2: 42, vol: 0.5, t, bus });
+    if (s === 0 || s === 6 || s === 8 || s === 14) tone(55 * Math.pow(2, ch[0] / 12), spb * 1.8, { type: 'triangle', vol: 0.32, t, bus });
+    if (s % 4 === 2) noise(0.05, { type: 'highpass', f: 7000, vol: 0.07 + 0.05 * I, t, bus });
+    const tones = [ch[0], ch[1], ch[2], ch[0] + 12];
+    if (I > 0.12 || s % 2 === 0) tone(440 * Math.pow(2, tones[ARP[s]] / 12), spb * 0.9, { type: 'square', vol: 0.03 + 0.02 * I, t, bus });
+  }
+  function schedule() {
+    if (!ctx || !mus.on) return;
+    try {
+      const spb = 60 / (104 + 36 * mus.intensity) / 4;
+      if (mus.next < ctx.currentTime - 0.2) mus.next = ctx.currentTime + 0.05; // recover after tab sleep
+      let guardN = 0;
+      while (mus.next < ctx.currentTime + 0.12 && guardN++ < 16) {
+        playStep(mus.step, mus.next, spb);
+        mus.next += spb; mus.step++;
+      }
+      musFilter.frequency.setTargetAtTime(700 + 3800 * mus.intensity, ctx.currentTime, 0.3);
+    } catch (e) {
+      if (!warned) { warned = true; console.warn('[Orbital] music error:', e); }
+      stopMusic();
+    }
+  }
+  function startMusic() {
+    if (!ctx || mus.on) return;
+    mus.on = true; mus.step = 0; mus.next = ctx.currentTime + 0.08;
+    mus.timer = setInterval(schedule, 25);
+  }
+  function stopMusic() { mus.on = false; clearInterval(mus.timer); }
+  function setIntensity(v) { mus.intensity = clamp(v, 0, 1); }
+
+  return {
+    unlock, suspend, apply, startMusic, stopMusic, setIntensity, sfx,
+    get available() { return !failed; },
+    get running() { return !!ctx && ctx.state === 'running'; },
+  };
+})();
+
+/* =====================================================================
+   5. Canvas, view & cached glow sprites
+   ===================================================================== */
+const canvas = $('game');
+const ctx = canvas.getContext('2d', { alpha: false });
+if (!ctx) throw new Error('Canvas 2D is not supported by this browser.');
+
+const view = { w: 1, h: 1, dpr: 1, scale: 1, hw: 1, hh: 1 };
+let backdrop = null, vignette = null;
+
+function resize() {
+  const w = Math.max(1, Math.floor(window.innerWidth || document.documentElement.clientWidth || 1));
+  const h = Math.max(1, Math.floor(window.innerHeight || document.documentElement.clientHeight || 1));
+  const dpr = clamp(window.devicePixelRatio || 1, 1, 2);
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
+  Object.assign(view, { w, h, dpr, scale: Math.min(w, h) / (2 * VIEW) });
+  view.hw = w / 2 / view.scale;
+  view.hh = h / 2 / view.scale;
+  buildBackdrop();
+}
+
+function buildBackdrop() {
+  const bw = Math.max(2, Math.round(view.w / 2)), bh = Math.max(2, Math.round(view.h / 2));
+  backdrop = document.createElement('canvas'); backdrop.width = bw; backdrop.height = bh;
+  const b = backdrop.getContext('2d');
+  const m = Math.max(bw, bh);
+  const blobs = [[0.3, 0.25, 'rgba(40,70,160,0.30)'], [0.75, 0.7, 'rgba(120,40,150,0.22)'], [0.55, 0.45, 'rgba(20,120,140,0.16)']];
+  for (const [x, y, c] of blobs) {
+    const g = b.createRadialGradient(x * bw, y * bh, 0, x * bw, y * bh, m * 0.6);
+    g.addColorStop(0, c); g.addColorStop(1, 'rgba(0,0,0,0)');
+    b.fillStyle = g; b.fillRect(0, 0, bw, bh);
+  }
+  vignette = document.createElement('canvas'); vignette.width = bw; vignette.height = bh;
+  const v = vignette.getContext('2d');
+  const g = v.createRadialGradient(bw / 2, bh / 2, Math.min(bw, bh) * 0.35, bw / 2, bh / 2, m * 0.75);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.65)');
+  v.fillStyle = g; v.fillRect(0, 0, bw, bh);
+}
+
+const rgbCache = new Map();
+function hexRgb(hex) {
+  let v = rgbCache.get(hex);
+  if (v) return v;
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  const n = m ? parseInt(m[1], 16) : 0xffffff;
+  v = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  rgbCache.set(hex, v);
+  return v;
+}
+function hueHex(h) {
+  // HSL(h, 85%, 66%) -> hex, hue quantised to 15deg so the glow-sprite cache stays tiny
+  h = ((Math.round(h / 15) * 15) % 360 + 360) % 360;
+  const sat = 0.85, lig = 0.66, a = sat * Math.min(lig, 1 - lig);
+  const f = n => {
+    const k = (n + h / 30) % 12;
+    const c = lig - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return Math.round(255 * c).toString(16).padStart(2, '0');
+  };
+  return '#' + f(0) + f(8) + f(4);
+}
+const glowCache = new Map();
+function glowSprite(hex) {
+  let c = glowCache.get(hex);
+  if (c) return c;
+  if (glowCache.size > 96) glowCache.clear();
+  const [r, g, b] = hexRgb(hex);
+  c = document.createElement('canvas'); c.width = c.height = 64;
+  const x = c.getContext('2d');
+  const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, `rgba(${r},${g},${b},1)`);
+  gr.addColorStop(0.2, `rgba(${r},${g},${b},0.55)`);
+  gr.addColorStop(0.5, `rgba(${r},${g},${b},0.14)`);
+  gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+  x.fillStyle = gr; x.fillRect(0, 0, 64, 64);
+  glowCache.set(hex, c);
+  return c;
+}
+function glow(hex, x, y, radius, alpha) {
+  if (alpha <= 0.002) return;
+  ctx.globalAlpha = Math.min(1, alpha);
+  ctx.drawImage(glowSprite(hex), x - radius, y - radius, radius * 2, radius * 2);
+}
+
+/* =====================================================================
+   6. Juice: particles, floating text, shake, flash, hit-stop
+   ===================================================================== */
+const P_MAX = 800;
+const parts = Array.from({ length: P_MAX }, () => ({ alive: false, x: 0, y: 0, vx: 0, vy: 0, life: 0, max: 1, size: 1, color: '#fff', drag: 2 }));
+let pCursor = 0;
+function particle(x, y, vx, vy, life, size, color, drag = 2.2) {
+  const p = parts[pCursor]; pCursor = (pCursor + 1) % P_MAX;
+  p.alive = true; p.x = x; p.y = y; p.vx = vx; p.vy = vy; p.life = p.max = life; p.size = size; p.color = color; p.drag = drag;
+}
+function burst(x, y, color, n, speed, life = 0.7, size = 3, drag = 2.4) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * TAU, s = speed * (0.25 + Math.random() * 0.75);
+    particle(x, y, Math.cos(a) * s, Math.sin(a) * s, life * (0.5 + Math.random() * 0.5), size * (0.6 + Math.random() * 0.7), color, drag);
+  }
+}
+const texts = [];
+function floatText(x, y, text, color, size = 16) {
+  if (texts.length > 24) texts.shift();
+  texts.push({ x, y, text, color, size, life: 1.0, max: 1.0 });
+}
+const ripples = [];
+function ripple(x, y, color, maxR, life = 0.5, width = 3) {
+  if (ripples.length > 20) ripples.shift();
+  ripples.push({ x, y, color, maxR, life, max: life, width });
+}
+const Fx = {
+  trauma: 0, flash: 0, flashColor: '#ffffff', punch: 0,
+  shake(a) { this.trauma = Math.min(1, this.trauma + a * save().settings.shake); },
+  doFlash(a, color = '#ffffff') { this.flash = Math.max(this.flash, a * save().settings.shake); this.flashColor = color; },
+  update(rdt) {
+    this.trauma = Math.max(0, this.trauma - rdt * 1.7);
+    this.flash = Math.max(0, this.flash - rdt * 3.2);
+    this.punch = Math.max(0, this.punch - rdt * 0.6);
+  },
+};
+
+/* =====================================================================
+   7. Game state
+   ===================================================================== */
+const G = {
+  state: 'menu',            // menu | playing | paused | dying | over
+  time: 0, score: 0, gems: 0, combo: 0, comboT: 0, mult: 1, maxMult: 1,
+  theta: -Math.PI / 2, dir: 1, omega: 2.1, diff: 0,
+  shield: false, magnetT: 0, slowT: 0, invuln: 0,
+  hitstop: 0, timeScale: 1, resumeRamp: 0, dyingT: 0,
+  meteors: [], pulses: [], gemsOnRing: [], powerups: [],
+  tMeteor: 1.2, tPulse: 14, tPower: 12, tGem: 0,
+  trail: [], squash: 0, menuFlipT: 2.5, coreBeat: 0,
+  lastHudScore: -1, lastHudMult: -1,
+  runId: 0,
+};
+const playerPos = () => [Math.cos(G.theta) * R, Math.sin(G.theta) * R];
+const currentSkin = () => {
+  const s = SKINS.find(k => k.id === save().skin);
+  return s && isUnlocked(s, save()) ? s : SKINS[0];
+};
+function skinTrailColor(i) {
+  const s = currentSkin();
+  return s.trail === 'rainbow' ? hueHex(performance.now() * 0.12 + i * 14) : s.trail;
+}
+
+function resetRun() {
+  G.runId++;
+  Object.assign(G, {
+    time: 0, score: 0, gems: 0, combo: 0, comboT: 0, mult: 1, maxMult: 1,
+    theta: -Math.PI / 2, dir: 1, omega: 2.1, diff: 0,
+    shield: false, magnetT: 0, slowT: 0, invuln: 0,
+    hitstop: 0, timeScale: 1, resumeRamp: 0, dyingT: 0,
+    tMeteor: 1.4, tPulse: 14, tPower: rand(10, 14), tGem: 0,
+    squash: 0, lastHudScore: -1, lastHudMult: -1,
+  });
+  G.meteors.length = 0; G.pulses.length = 0; G.gemsOnRing.length = 0; G.powerups.length = 0;
+  G.trail.length = 0; texts.length = 0; ripples.length = 0;
+  for (const p of parts) p.alive = false;
+  spawnGem(); spawnGem();
+}
+
+/* ---------- spawning ---------- */
+function freeRingAngle(minFromPlayer, minFromOthers) {
+  for (let tries = 0; tries < 12; tries++) {
+    const a = G.theta + (Math.random() < 0.5 ? -1 : 1) * rand(minFromPlayer, Math.PI);
+    const others = [...G.gemsOnRing, ...G.powerups];
+    if (others.every(o => Math.abs(angDiff(o.a, a)) > minFromOthers)) return a;
+  }
+  return G.theta + Math.PI; // fallback: opposite side, always valid
+}
+function spawnGem() {
+  if (G.gemsOnRing.length >= 3) return;
+  G.gemsOnRing.push({ a: freeRingAngle(0.9, 0.45), life: 8, max: 8, born: 0 });
+}
+function spawnPower() {
+  if (G.powerups.length) return;
+  const types = ['shield', 'magnet', 'slow'];
+  G.powerups.push({ a: freeRingAngle(1.2, 0.5), type: types[Math.floor(Math.random() * types.length)], life: 7, max: 7, born: 0 });
+}
+function spawnMeteor() {
+  const d = G.diff;
+  const spawnR = Math.max(430, Math.hypot(view.hw, view.hh) + 40);
+  const from = Math.random() * TAU;
+  const sx = Math.cos(from) * spawnR, sy = Math.sin(from) * spawnR;
+  const speed = rand(125, 175) + 150 * d;
+  // 45% aim where the player will be, the rest cross the ring at random
+  let tx, ty;
+  if (Math.random() < 0.45) {
+    const eta = spawnR / speed;
+    const a = G.theta + G.dir * G.omega * eta * rand(0.6, 1.0) + rand(-0.5, 0.5);
+    tx = Math.cos(a) * R; ty = Math.sin(a) * R;
+  } else {
+    const a = Math.random() * TAU, rr = rand(0, R + 40);
+    tx = Math.cos(a) * rr; ty = Math.sin(a) * rr;
+  }
+  const dx = tx - sx, dy = ty - sy, len = Math.hypot(dx, dy) || 1;
+  const r = rand(10, 18) + (Math.random() < 0.15 ? 8 : 0);
+  const verts = [];
+  const nv = 9;
+  for (let i = 0; i < nv; i++) verts.push(rand(0.72, 1.08));
+  G.meteors.push({ x: sx, y: sy, vx: dx / len * speed, vy: dy / len * speed, r, rot: Math.random() * TAU, spin: rand(-2, 2), verts, near: false, awarded: false, prevD: Infinity, dead: false });
+}
+function spawnPulse() {
+  const d = G.diff;
+  const gap = G.theta + rand(-2.0, 2.0);
+  G.pulses.push({ r: 30, gap, half: lerp(0.66, 0.42, d), resolved: false, hit: false });
+  Sound.sfx.pulse();
+  G.coreBeat = 1;
+}
+
+/* ---------- scoring ---------- */
+function addScore(base, x, y, label, color) {
+  const pts = Math.round(base * G.mult);
+  G.score = Math.min(MAX_INT, G.score + pts);
+  floatText(x, y, label ? `${label} +${pts}` : `+${pts}`, color || '#ffffff', label ? 15 : 14);
+}
+function bumpCombo() {
+  G.combo++;
+  G.comboT = COMBO_TIME;
+  const m = Math.min(8, 1 + Math.floor(G.combo / 4));
+  if (m > G.mult) {
+    G.mult = m;
+    G.maxMult = Math.max(G.maxMult, m);
+    const [px, py] = playerPos();
+    floatText(px * 0.6, py * 0.6 - 10, `x${m}`, '#ffd166', 30);
+    Sound.sfx.mult(m);
+    Fx.shake(0.18); Fx.punch = Math.max(Fx.punch, 0.035);
+    ripple(0, 0, '#ffd166', R * 1.4, 0.6, 4);
+  }
+}
+
+/* ---------- player actions ---------- */
+function flip() {
+  if (G.state !== 'playing') return;
+  G.dir *= -1;
+  G.squash = 1;
+  const [x, y] = playerPos();
+  const tx = -Math.sin(G.theta) * G.dir, ty = Math.cos(G.theta) * G.dir;
+  for (let i = 0; i < 8; i++) particle(x, y, -tx * rand(60, 160) + rand(-40, 40), -ty * rand(60, 160) + rand(-40, 40), 0.35, 2.4, skinTrailColor(i), 4);
+  ripple(x, y, currentSkin().color, 26, 0.3, 2);
+  Fx.shake(0.04);
+  Sound.sfx.flip();
+}
+
+function hurt(source) {
+  if (G.state !== 'playing' || G.invuln > 0) return;
+  const [x, y] = playerPos();
+  if (G.shield) {
+    G.shield = false; G.invuln = 1.25;
+    if (source && source.kind === 'meteor') { source.m.dead = true; burst(source.m.x, source.m.y, '#ff8a6b', 24, 260, 0.6, 3); }
+    burst(x, y, '#7cf7ff', 36, 320, 0.7, 3);
+    ripple(x, y, '#7cf7ff', 90, 0.5, 4);
+    floatText(x, y - 22, 'SHIELD BROKE', '#7cf7ff', 15);
+    Fx.shake(0.45); Fx.doFlash(0.35, '#7cf7ff'); G.hitstop = 0.06;
+    Sound.sfx.shield();
+    return;
+  }
+  die();
+}
+
+function die() {
+  G.state = 'dying';
+  G.dyingT = 0;
+  G.hitstop = 0.13;
+  G.timeScale = 0.3;
+  const [x, y] = playerPos();
+  const sk = currentSkin();
+  burst(x, y, '#ffffff', 50, 520, 1.1, 3.5, 1.6);
+  burst(x, y, sk.color, 70, 380, 1.4, 4, 1.4);
+  burst(x, y, '#ff4d6d', 50, 260, 1.2, 3, 1.4);
+  ripple(x, y, '#ffffff', 220, 0.9, 6);
+  ripple(x, y, sk.color, 140, 0.7, 3);
+  Fx.shake(1); Fx.doFlash(0.9, '#ffffff'); Fx.punch = 0.08;
+  Sound.sfx.death();
+  Sound.stopMusic();
+  UI.hud(false);
+  finishRun();
+}
+
+/* ---------- end of run: commit progression immediately ---------- */
+let lastResult = null;
+function finishRun() {
+  const d = save();
+  const before = unlockedIds(d);
+  const prevBest = d.best, prevXp = d.xp;
+  const score = Math.floor(G.score);
+  d.runs = Math.min(MAX_INT, d.runs + 1);
+  d.totalGems = Math.min(MAX_INT, d.totalGems + G.gems);
+  d.xp = Math.min(MAX_INT, d.xp + score);
+  d.maxMult = Math.max(d.maxMult, G.maxMult);
+  d.bestTime = Math.max(d.bestTime, G.time);
+  const newBest = score > prevBest;
+  if (newBest) d.best = score;
+  const saved = Store.commit();
+  const after = unlockedIds(d);
+  lastResult = {
+    score, newBest: newBest && prevBest > 0, gems: G.gems, time: G.time, maxMult: G.maxMult,
+    prevXp, xp: d.xp, rankBefore: rankOf(prevXp), rankAfter: rankOf(d.xp),
+    unlocked: SKINS.filter(s => after.has(s.id) && !before.has(s.id)),
+    saved,
+  };
+}
+
+/* =====================================================================
+   8. Simulation (fixed step)
+   ===================================================================== */
+function update(dt) {
+  const playing = G.state === 'playing';
+  const hz = G.slowT > 0 ? 0.5 : 1; // slow power-up affects hazards only
+
+  if (G.state === 'menu') {
+    G.theta += G.dir * 1.6 * dt;
+    G.menuFlipT -= dt;
+    if (G.menuFlipT <= 0) { G.dir *= -1; G.menuFlipT = rand(1.5, 3.5); G.squash = 1; }
+  }
+
+  if (playing) {
+    G.time += dt;
+    G.diff = Math.min(1, G.time / 150);
+    G.omega = 2.1 + 1.5 * G.diff;
+    G.theta = (G.theta + G.dir * G.omega * dt) % TAU;
+    G.score = Math.min(MAX_INT, G.score + 10 * dt * G.mult);
+    G.invuln = Math.max(0, G.invuln - dt);
+    G.magnetT = Math.max(0, G.magnetT - dt);
+    G.slowT = Math.max(0, G.slowT - dt);
+    Sound.setIntensity(G.diff * 0.8 + (G.mult - 1) / 7 * 0.2);
+
+    if (G.comboT > 0) {
+      G.comboT -= dt;
+      if (G.comboT <= 0) {
+        if (G.combo >= 4) { const [x, y] = playerPos(); floatText(x, y - 20, 'CHAIN BROKEN', '#8d95bb', 13); Sound.sfx.comboLost(); }
+        G.combo = 0; G.mult = 1; G.comboT = 0;
+      }
+    }
+
+    // spawn timers
+    G.tMeteor -= dt * hz;
+    if (G.tMeteor <= 0) { spawnMeteor(); G.tMeteor = lerp(1.5, 0.42, G.diff) * rand(0.7, 1.3); if (G.diff > 0.5 && Math.random() < 0.25) spawnMeteor(); }
+    G.tPulse -= dt * hz;
+    if (G.tPulse <= 0) { spawnPulse(); G.tPulse = lerp(9, 4.2, G.diff) * rand(0.85, 1.15); }
+    G.tPower -= dt;
+    if (G.tPower <= 0) { spawnPower(); G.tPower = rand(13, 19); }
+    G.tGem -= dt;
+    if (G.gemsOnRing.length < 2 || (G.tGem <= 0 && G.gemsOnRing.length < 3)) { spawnGem(); G.tGem = rand(1.2, 2.2); }
+  }
+
+  const [px, py] = playerPos();
+
+  // shards
+  for (let i = G.gemsOnRing.length - 1; i >= 0; i--) {
+    const g = G.gemsOnRing[i];
+    g.born += dt;
+    if (!playing) continue;
+    g.life -= dt;
+    if (G.magnetT > 0) {
+      const da = angDiff(G.theta, g.a);
+      if (Math.abs(da) < 1.6) g.a += Math.sign(da) * Math.min(Math.abs(da), 3.2 * dt);
+    }
+    const gx = Math.cos(g.a) * R, gy = Math.sin(g.a) * R;
+    if (Math.hypot(gx - px, gy - py) < GEM_PICK_R) {
+      G.gemsOnRing.splice(i, 1);
+      G.gems++;
+      bumpCombo();
+      addScore(25, gx, gy - 16, '', currentSkin().color);
+      burst(gx, gy, currentSkin().color, 16, 220, 0.55, 3);
+      burst(gx, gy, '#ffffff', 6, 140, 0.4, 2);
+      ripple(gx, gy, currentSkin().color, 34, 0.35, 2);
+      Fx.punch = Math.max(Fx.punch, 0.012);
+      Sound.sfx.gem(G.combo);
+      continue;
+    }
+    if (g.life <= 0) { G.gemsOnRing.splice(i, 1); burst(gx, gy, '#5a6288', 6, 60, 0.4, 2); }
+  }
+
+  // power-ups
+  for (let i = G.powerups.length - 1; i >= 0; i--) {
+    const u = G.powerups[i];
+    u.born += dt;
+    if (!playing) continue;
+    u.life -= dt;
+    const ux = Math.cos(u.a) * R, uy = Math.sin(u.a) * R;
+    if (Math.hypot(ux - px, uy - py) < GEM_PICK_R + 2) {
+      G.powerups.splice(i, 1);
+      const col = POWER_COLORS[u.type];
+      if (u.type === 'shield') G.shield = true;
+      if (u.type === 'magnet') G.magnetT = 7;
+      if (u.type === 'slow') G.slowT = 5;
+      floatText(ux, uy - 20, POWER_NAMES[u.type], col, 17);
+      burst(ux, uy, col, 30, 260, 0.7, 3);
+      ripple(ux, uy, col, 70, 0.5, 3);
+      Fx.doFlash(0.18, col);
+      Sound.sfx.power();
+      continue;
+    }
+    if (u.life <= 0) G.powerups.splice(i, 1);
+  }
+
+  // meteors
+  for (let i = G.meteors.length - 1; i >= 0; i--) {
+    const m = G.meteors[i];
+    const k = (G.state === 'playing' ? hz : 1) * dt;
+    m.x += m.vx * k; m.y += m.vy * k; m.rot += m.spin * k;
+    if (Math.random() < 0.35) particle(m.x + rand(-m.r, m.r) * 0.4, m.y + rand(-m.r, m.r) * 0.4, -m.vx * 0.15 + rand(-20, 20), -m.vy * 0.15 + rand(-20, 20), 0.45, 2.2, '#ff7a45', 2);
+    const dist = Math.hypot(m.x - px, m.y - py);
+    if (playing && !m.dead) {
+      if (dist < m.r + PLAYER_HIT_R) { hurt({ kind: 'meteor', m }); if (G.state !== 'playing') break; }
+      else {
+        if (dist < m.r + 30) m.near = true;
+        if (m.near && !m.awarded && dist > m.prevD) {
+          m.awarded = true;
+          addScore(15, px, py - 24, 'CLOSE', '#ff9f6b');
+          G.comboT = Math.max(G.comboT, Math.min(COMBO_TIME, G.comboT + 1.0));
+          Fx.shake(0.06);
+          Sound.sfx.near();
+        }
+      }
+    }
+    m.prevD = dist;
+    const out = Math.hypot(m.x, m.y) > Math.max(500, Math.hypot(view.hw, view.hh) + 90) && (m.x * m.vx + m.y * m.vy) > 0;
+    if (m.dead || out) G.meteors.splice(i, 1);
+  }
+
+  // pulses (expanding rings with a safe gap)
+  for (let i = G.pulses.length - 1; i >= 0; i--) {
+    const p = G.pulses[i];
+    p.r += 118 * dt * (G.state === 'playing' ? hz : 1);
+    if (playing && !p.resolved) {
+      const inGap = Math.abs(angDiff(G.theta, p.gap)) < p.half;
+      if (Math.abs(p.r - R) < 6 && !inGap && G.invuln <= 0) { p.resolved = true; p.hit = true; hurt({ kind: 'pulse' }); if (G.state !== 'playing') break; }
+      else if (p.r > R + 8) {
+        p.resolved = true;
+        if (!inGap) continue; // passed only thanks to invulnerability: no reward
+        addScore(40, px, py - 24, 'THREADED', '#7dffb0');
+        G.comboT = Math.max(G.comboT, Math.min(COMBO_TIME, G.comboT + 1.5));
+        Sound.sfx.thread();
+        ripple(px, py, '#7dffb0', 40, 0.4, 2);
+      }
+    }
+    if (p.r > Math.hypot(view.hw, view.hh) + 40) G.pulses.splice(i, 1);
+  }
+
+  // trail sampling
+  if (G.state === 'playing' || G.state === 'menu') {
+    G.trail.unshift([px, py]);
+    if (G.trail.length > 26) G.trail.length = 26;
+  } else if (G.trail.length) {
+    G.trail.pop();
+  }
+}
+
+function updateFx(dt) {
+  for (const p of parts) {
+    if (!p.alive) continue;
+    p.life -= dt;
+    if (p.life <= 0) { p.alive = false; continue; }
+    const k = Math.exp(-p.drag * dt);
+    p.vx *= k; p.vy *= k;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (let i = texts.length - 1; i >= 0; i--) { const t = texts[i]; t.life -= dt; t.y -= 34 * dt; if (t.life <= 0) texts.splice(i, 1); }
+  for (let i = ripples.length - 1; i >= 0; i--) { const r = ripples[i]; r.life -= dt; if (r.life <= 0) ripples.splice(i, 1); }
+  G.squash = Math.max(0, G.squash - dt * 6);
+  G.coreBeat = Math.max(0, G.coreBeat - dt * 2);
+}
+
+/* =====================================================================
+   9. Rendering
+   ===================================================================== */
+const POWER_COLORS = { shield: '#7cf7ff', magnet: '#ffd166', slow: '#c3b0ff' };
+const POWER_NAMES = { shield: 'SHIELD', magnet: 'MAGNET', slow: 'SLOW-MO' };
+const stars = Array.from({ length: 220 }, () => ({ a: Math.random() * TAU, d: Math.sqrt(Math.random()) * 950, z: rand(0.25, 1), tw: Math.random() * TAU }));
+
+function render(now) {
+  const { w, h, dpr, scale } = view;
+  const tsec = now / 1000;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#05060f';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (backdrop) ctx.drawImage(backdrop, 0, 0, canvas.width, canvas.height);
+
+  const sh = Fx.trauma * Fx.trauma * 18;
+  const sx = (Math.random() * 2 - 1) * sh, sy = (Math.random() * 2 - 1) * sh;
+  const k = dpr * scale * (1 + Fx.punch);
+  ctx.setTransform(k, 0, 0, k, dpr * (w / 2 + sx), dpr * (h / 2 + sy));
+
+  const sk = currentSkin();
+  const coreHue = 190 + 140 * G.diff;
+
+  // stars (slow parallax rotation)
+  ctx.fillStyle = '#cfd8ff';
+  const rot = tsec * 0.02;
+  for (const s of stars) {
+    const a = s.a + rot * s.z;
+    const x = Math.cos(a) * s.d, y = Math.sin(a) * s.d;
+    ctx.globalAlpha = (0.25 + 0.45 * s.z) * (0.7 + 0.3 * Math.sin(tsec * 2 + s.tw));
+    const sz = 0.6 + s.z * 1.3;
+    ctx.fillRect(x, y, sz, sz);
+  }
+
+  ctx.globalCompositeOperation = 'lighter';
+
+  // orbit ring
+  ctx.globalAlpha = 0.22;
+  ctx.strokeStyle = '#8fa2ff';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.stroke();
+  ctx.globalAlpha = 0.07; ctx.lineWidth = 10;
+  ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.stroke();
+
+  // pulse safe-gap markers on the ring
+  for (const p of G.pulses) {
+    if (p.resolved) continue;
+    const near = clamp(1 - (R - p.r) / (R - 30), 0, 1);
+    ctx.globalAlpha = 0.25 + 0.55 * near;
+    ctx.strokeStyle = '#7dffb0'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(0, 0, R, p.gap - p.half, p.gap + p.half); ctx.stroke();
+  }
+
+  // core
+  const beat = 1 + 0.08 * Math.sin(tsec * 4) + 0.35 * G.coreBeat;
+  const coreCol = hueHex(coreHue);
+  glow(coreCol, 0, 0, 90 * beat, 0.55);
+  glow('#ffffff', 0, 0, 34 * beat, 0.5);
+  ctx.globalAlpha = 0.8; ctx.strokeStyle = coreCol; ctx.lineWidth = 2;
+  for (let i = 0; i < 3; i++) {
+    const a0 = tsec * (0.8 + i * 0.5) * (i % 2 ? -1 : 1) + i * 2;
+    ctx.beginPath(); ctx.arc(0, 0, 20 + i * 7, a0, a0 + 1.6); ctx.stroke();
+  }
+  // combo timer arc around core
+  if (G.state === 'playing' && G.comboT > 0) {
+    ctx.globalAlpha = 0.9; ctx.strokeStyle = sk.color; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(0, 0, 48, -Math.PI / 2, -Math.PI / 2 + TAU * (G.comboT / COMBO_TIME)); ctx.stroke();
+  }
+
+  // pulses
+  for (const p of G.pulses) {
+    const fade = clamp(1 - (p.r - R) / 260, 0, 1) * (p.hit ? 0.4 : 1);
+    if (fade <= 0) continue;
+    const a0 = p.gap + p.half, a1 = p.gap - p.half + TAU;
+    ctx.strokeStyle = '#ff4d6d'; ctx.lineCap = 'round';
+    ctx.globalAlpha = 0.18 * fade; ctx.lineWidth = 16;
+    ctx.beginPath(); ctx.arc(0, 0, p.r, a0, a1); ctx.stroke();
+    ctx.globalAlpha = 0.95 * fade; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(0, 0, p.r, a0, a1); ctx.stroke();
+  }
+
+  // shards
+  for (const g of G.gemsOnRing) {
+    const x = Math.cos(g.a) * R, y = Math.sin(g.a) * R;
+    const pop = Math.min(1, g.born * 5);
+    const s = (1 - Math.pow(1 - pop, 3)) * (1 + 0.1 * Math.sin(tsec * 6 + g.a));
+    const blink = g.life < 2 ? (Math.sin(tsec * 22) > 0 ? 1 : 0.35) : 1;
+    glow(sk.color, x, y, 30 * s, 0.6 * blink);
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(tsec * 2 + g.a); ctx.scale(s, s);
+    ctx.globalAlpha = blink; ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(6.5, 0); ctx.lineTo(0, 9); ctx.lineTo(-6.5, 0); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  // power-ups
+  for (const u of G.powerups) {
+    const x = Math.cos(u.a) * R, y = Math.sin(u.a) * R, col = POWER_COLORS[u.type];
+    const pop = Math.min(1, u.born * 4), s = (1 - Math.pow(1 - pop, 3)) * (1 + 0.12 * Math.sin(tsec * 5));
+    const blink = u.life < 2 ? (Math.sin(tsec * 22) > 0 ? 1 : 0.35) : 1;
+    glow(col, x, y, 40 * s, 0.7 * blink);
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+    ctx.globalAlpha = blink; ctx.strokeStyle = col; ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.arc(0, 0, 14, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = '#ffffff'; ctx.beginPath();
+    if (u.type === 'shield') { for (let i = 0; i <= 6; i++) { const a = i / 6 * TAU + Math.PI / 6; i ? ctx.lineTo(Math.cos(a) * 7, Math.sin(a) * 7) : ctx.moveTo(Math.cos(a) * 7, Math.sin(a) * 7); } }
+    else if (u.type === 'magnet') { ctx.arc(0, 1, 6, Math.PI, 0, false); ctx.moveTo(-6, 1); ctx.lineTo(-6, -5); ctx.moveTo(6, 1); ctx.lineTo(6, -5); }
+    else { ctx.moveTo(-5, -7); ctx.lineTo(5, -7); ctx.lineTo(-5, 7); ctx.lineTo(5, 7); ctx.closePath(); }
+    ctx.stroke(); ctx.restore();
+  }
+
+  // meteors
+  for (const m of G.meteors) {
+    glow('#ff5a3c', m.x, m.y, m.r * 3, 0.45);
+    ctx.save(); ctx.translate(m.x, m.y); ctx.rotate(m.rot);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1; ctx.fillStyle = '#1b1324'; ctx.strokeStyle = '#ff7a59'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    for (let i = 0; i < m.verts.length; i++) {
+      const a = i / m.verts.length * TAU, rr = m.r * m.verts[i];
+      i ? ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    ctx.globalCompositeOperation = 'lighter';
+  }
+
+  // ripples
+  for (const r of ripples) {
+    const t = 1 - r.life / r.max, e = 1 - Math.pow(1 - t, 3);
+    ctx.globalAlpha = (1 - t) * 0.8; ctx.strokeStyle = r.color; ctx.lineWidth = r.width * (1 - t) + 0.5;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 4 + r.maxR * e, 0, TAU); ctx.stroke();
+  }
+
+  // player trail + head
+  const alive = G.state === 'playing' || G.state === 'menu' || G.state === 'paused';
+  if (G.trail.length > 1) {
+    ctx.lineCap = 'round';
+    for (let i = 1; i < G.trail.length; i++) {
+      const t = 1 - i / G.trail.length;
+      ctx.globalAlpha = t * 0.85; ctx.strokeStyle = skinTrailColor(i); ctx.lineWidth = 1 + t * 9;
+      ctx.beginPath(); ctx.moveTo(G.trail[i - 1][0], G.trail[i - 1][1]); ctx.lineTo(G.trail[i][0], G.trail[i][1]); ctx.stroke();
+    }
+  }
+  if (alive) {
+    const [x, y] = playerPos();
+    const blink = G.invuln > 0 && Math.sin(tsec * 40) < 0 ? 0.35 : 1;
+    const sq = 1 + 0.5 * G.squash;
+    glow(sk.color, x, y, 38 * sq, 0.8 * blink);
+    ctx.globalAlpha = blink; ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(x, y, 7 * (1 + 0.25 * G.squash), 0, TAU); ctx.fill();
+    if (G.shield) {
+      ctx.globalAlpha = 0.85; ctx.strokeStyle = POWER_COLORS.shield; ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i <= 6; i++) { const a = i / 6 * TAU + tsec * 2; const px2 = x + Math.cos(a) * 17, py2 = y + Math.sin(a) * 17; i ? ctx.lineTo(px2, py2) : ctx.moveTo(px2, py2); }
+      ctx.stroke();
+    }
+    if (G.magnetT > 0) {
+      ctx.globalAlpha = 0.25 + 0.15 * Math.sin(tsec * 10); ctx.strokeStyle = POWER_COLORS.magnet; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.arc(0, 0, R, G.theta - 1.6, G.theta + 1.6); ctx.stroke();
+    }
+  }
+
+  // particles
+  for (const p of parts) {
+    if (!p.alive) continue;
+    const t = p.life / p.max;
+    glow(p.color, p.x, p.y, p.size * 2.6 * (0.4 + 0.6 * t), t);
+  }
+
+  // floating text
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const t of texts) {
+    const age = 1 - t.life / t.max;
+    const sc = age < 0.15 ? 0.6 + (age / 0.15) * 0.6 : 1.2 - Math.min(0.2, (age - 0.15));
+    ctx.globalAlpha = clamp(t.life / 0.35, 0, 1);
+    ctx.font = `800 ${(t.size * sc).toFixed(1)}px ${FONT}`;
+    ctx.fillStyle = 'rgba(5,6,15,0.6)'; ctx.fillText(t.text, t.x + 1.2, t.y + 1.5);
+    ctx.fillStyle = t.color; ctx.fillText(t.text, t.x, t.y);
+  }
+
+  // off-screen meteor warnings
+  ctx.globalCompositeOperation = 'lighter';
+  const ex = view.hw - 18, ey = view.hh - 18;
+  for (const m of G.meteors) {
+    if (Math.abs(m.x) < view.hw && Math.abs(m.y) < view.hh) continue;
+    if (m.x * m.vx + m.y * m.vy > 0) continue; // leaving, no warning
+    const f = Math.min(ex / Math.max(1e-6, Math.abs(m.x)), ey / Math.max(1e-6, Math.abs(m.y)));
+    const ix = m.x * f, iy = m.y * f, ang = Math.atan2(m.y, m.x);
+    ctx.save(); ctx.translate(ix, iy); ctx.rotate(ang);
+    ctx.globalAlpha = 0.6 + 0.4 * Math.sin(tsec * 16);
+    ctx.fillStyle = '#ff5a3c';
+    ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-6, -7); ctx.lineTo(-3, 0); ctx.lineTo(-6, 7); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  // screen-space overlays
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (Fx.flash > 0) {
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = Fx.flash * 0.55; ctx.fillStyle = Fx.flashColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  if (G.slowT > 0) {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = Math.min(1, G.slowT) * 0.12; ctx.fillStyle = '#6a4cff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+  if (vignette) ctx.drawImage(vignette, 0, 0, canvas.width, canvas.height);
+}
+
+/* =====================================================================
+   10. UI layer (DOM overlays)
+   ===================================================================== */
+const UI = (() => {
+  const screens = { title: $('scrTitle'), hangar: $('scrHangar'), settings: $('scrSettings'), pause: $('scrPause'), over: $('scrOver') };
+  const hudEl = $('hud'), hudScore = $('hudScore'), hudMult = $('hudMult'), hudCombo = $('hudCombo'), hudBest = $('hudBest'), hudPowers = $('hudPowers');
+  let current = null, overShownAt = 0, countRaf = 0, lastPowers = '';
+
+  function show(name) {
+    for (const [k, el] of Object.entries(screens)) el.classList.toggle('show', k === name);
+    current = name;
+    if (name === 'over') overShownAt = performance.now();
+    const focusMap = { title: 'btnPlay', hangar: 'btnHangarBack', settings: 'btnSettingsBack', pause: 'btnResume', over: 'btnRetry' };
+    if (name && focusMap[name]) setTimeout(() => { const b = document.getElementById(focusMap[name]); if (b && screens[name].classList.contains('show')) b.focus({ preventScroll: true }); }, 30);
+  }
+  function hud(on) { hudEl.classList.toggle('on', on); }
+  function setAccent() {
+    const c = currentSkin().color;
+    document.documentElement.style.setProperty('--accent', c);
+  }
+  function updateHud() {
+    const s = Math.floor(G.score);
+    if (s !== G.lastHudScore) { hudScore.textContent = fmt(s); G.lastHudScore = s; }
+    if (G.mult !== G.lastHudMult) {
+      hudMult.textContent = 'x' + G.mult;
+      hudMult.style.color = G.mult >= 5 ? '#ffd166' : G.mult >= 3 ? '#ff9f6b' : '';
+      if (G.mult > G.lastHudMult && G.lastHudMult !== -1) { hudMult.classList.remove('pop'); void hudMult.offsetWidth; hudMult.classList.add('pop'); }
+      G.lastHudMult = G.mult;
+    }
+    hudCombo.style.transform = `scaleX(${clamp(G.comboT / COMBO_TIME, 0, 1).toFixed(3)})`;
+    const p = [];
+    if (G.shield) p.push('shield');
+    if (G.magnetT > 0) p.push('magnet:' + Math.ceil(G.magnetT));
+    if (G.slowT > 0) p.push('slow:' + Math.ceil(G.slowT));
+    const key = p.join('|');
+    if (key !== lastPowers) {
+      lastPowers = key;
+      hudPowers.replaceChildren(...p.map(x => {
+        const [t, n] = x.split(':');
+        const el = document.createElement('span');
+        el.className = 'chip'; el.style.color = POWER_COLORS[t];
+        el.textContent = POWER_NAMES[t] + (n ? ' ' + n : '');
+        return el;
+      }));
+    }
+  }
+  function refreshTitle() {
+    const d = save();
+    $('tBest').textContent = fmt(d.best);
+    $('tRank').textContent = rankOf(d.xp);
+    $('tGems').textContent = fmt(d.totalGems);
+    hudBest.textContent = fmt(d.best);
+    setAccent();
+    refreshStoreNote();
+  }
+  function refreshStoreNote() {
+    const n = $('storeNote');
+    n.textContent = Store.writable ? '' : Store.reason;
+    n.classList.toggle('on', !Store.writable);
+  }
+  function buildHangar() {
+    const grid = $('skinGrid'), d = save();
+    grid.replaceChildren();
+    for (const s of SKINS) {
+      const un = isUnlocked(s, d), sel = currentSkin().id === s.id;
+      const b = document.createElement('button');
+      b.className = 'skin' + (sel ? ' sel' : '');
+      b.style.color = s.trail === 'rainbow' ? '#ffffff' : s.color;
+      b.disabled = !un;
+      b.setAttribute('aria-pressed', String(sel));
+      b.setAttribute('aria-label', `${s.name}${un ? (sel ? ', equipped' : ', unlocked') : ', locked: ' + reqText(s)}`);
+      const orb = document.createElement('span'); orb.className = 'orb';
+      if (s.trail === 'rainbow') orb.style.background = 'conic-gradient(#ff5e8a,#ffd166,#7dffb0,#5ee7ff,#c3b0ff,#ff5e8a)';
+      const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = s.name;
+      const rq = document.createElement('span'); rq.className = 'rq'; rq.textContent = un ? (sel ? 'Equipped' : 'Tap to equip') : reqText(s);
+      b.append(orb, nm, rq);
+      if (sel) { const t = document.createElement('span'); t.className = 'tick'; t.textContent = 'ON'; b.append(t); }
+      if (!un) {
+        const mini = document.createElement('span'); mini.className = 'mini';
+        const fill = document.createElement('i'); fill.style.width = (clamp(reqValue(s, d) / s.req.n, 0, 1) * 100).toFixed(1) + '%';
+        mini.append(fill); b.append(mini);
+      }
+      b.addEventListener('click', () => {
+        if (!isUnlocked(s, save())) return;
+        save().skin = s.id; Store.commit(); Sound.sfx.ui();
+        setAccent(); buildHangar();
+      });
+      grid.append(b);
+    }
+  }
+  function syncSettings() {
+    const s = save().settings;
+    $('optSfx').setAttribute('aria-pressed', String(s.sfx));
+    $('optMusic').setAttribute('aria-pressed', String(s.music));
+    $('optVol').value = Math.round(s.volume * 100);
+    $('optShake').value = Math.round(s.shake * 100);
+    $('audioNote').textContent = Sound.available ? 'Synthesized live' : 'Audio is not available in this browser';
+  }
+  function showOver() {
+    const r = lastResult;
+    if (!r) return;
+    $('oBadge').classList.toggle('on', r.newBest);
+    $('oGems').textContent = fmt(r.gems);
+    $('oTime').textContent = r.time.toFixed(1) + 's';
+    $('oMult').textContent = 'x' + r.maxMult;
+    const bar = $('oBar');
+    bar.style.transition = 'none';
+    bar.style.width = (r.rankAfter > r.rankBefore ? 0 : rankProgress(r.prevXp) * 100) + '%';
+    void bar.offsetWidth;
+    bar.style.transition = '';
+    $('oRank').textContent = r.rankAfter + (r.rankAfter > r.rankBefore ? '  ▲' : '');
+    const nextXp = r.rankAfter >= RANK_MAX ? r.xp : xpFor(r.rankAfter + 1);
+    $('oXp').textContent = r.rankAfter >= RANK_MAX ? 'Max rank' : `${fmt(r.xp - xpFor(r.rankAfter))} / ${fmt(nextXp - xpFor(r.rankAfter))} XP`;
+    const list = $('oUnlocks');
+    list.replaceChildren();
+    for (const s of r.unlocked) {
+      const el = document.createElement('div'); el.className = 'unlock';
+      const dot = document.createElement('span'); dot.className = 'dot'; dot.style.color = s.trail === 'rainbow' ? '#ffffff' : s.color;
+      const tx = document.createElement('span'); tx.textContent = `Unlocked: ${s.name} skin`;
+      el.append(dot, tx); list.append(el);
+    }
+    if (!r.saved && Store.reason) {
+      const el = document.createElement('div'); el.className = 'unlock'; el.style.borderColor = 'rgba(255,77,109,.4)'; el.style.background = 'rgba(255,77,109,.08)';
+      el.textContent = 'Not saved: ' + Store.reason; list.append(el);
+    }
+    show('over');
+    // score count-up
+    cancelAnimationFrame(countRaf);
+    const scoreEl = $('oScore'), t0 = performance.now(), dur = 700;
+    const tick = now => {
+      const t = clamp((now - t0) / dur, 0, 1), e = 1 - Math.pow(1 - t, 3);
+      scoreEl.textContent = fmt(r.score * e);
+      if (t < 1) countRaf = requestAnimationFrame(tick);
+    };
+    countRaf = requestAnimationFrame(tick);
+    setTimeout(() => { bar.style.width = (rankProgress(r.xp) * 100).toFixed(1) + '%'; }, 250);
+    if (r.newBest || r.unlocked.length || r.rankAfter > r.rankBefore) setTimeout(() => Sound.sfx.fanfare(), 300);
+    hudBest.textContent = fmt(save().best);
+  }
+  return {
+    show, hud, updateHud, refreshTitle, refreshStoreNote, buildHangar, syncSettings, showOver, setAccent,
+    get current() { return current; },
+    get overAge() { return performance.now() - overShownAt; },
+  };
+})();
+
+function toast(msg, kind = '', ms = 2800) {
+  const box = document.getElementById('toasts');
+  if (!box) return;
+  while (box.children.length >= 3) box.firstChild.remove();
+  const el = document.createElement('div');
+  el.className = 'toast' + (kind ? ' ' + kind : '');
+  el.textContent = msg;
+  box.append(el);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 320); }, ms);
+}
+
+/* =====================================================================
+   11. Flow control
+   ===================================================================== */
+function startRun() {
+  Sound.unlock();
+  resetRun();
+  G.state = 'playing';
+  UI.show(null);
+  UI.hud(true);
+  UI.setAccent();
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  const [x, y] = playerPos();
+  burst(x, y, currentSkin().color, 30, 240, 0.6, 3);
+  ripple(0, 0, currentSkin().color, R * 1.2, 0.6, 3);
+  Sound.sfx.start();
+  Sound.setIntensity(0);
+  Sound.startMusic();
+}
+function retry() {
+  if (G.state !== 'over') return;          // stale clicks from a fading overlay do nothing
+  if (UI.overAge < 320) return;            // swallow the panic-tap that killed you
+  startRun();
+}
+function pause() {
+  if (G.state !== 'playing') return;
+  G.state = 'paused';
+  Sound.stopMusic();
+  UI.hud(false);
+  UI.show('pause');
+}
+function resume() {
+  if (G.state !== 'paused') return;
+  Sound.unlock();
+  G.state = 'playing';
+  G.resumeRamp = 0.7; // ease back in so a resume never drops you into a hit
+  UI.show(null);
+  UI.hud(true);
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  Sound.startMusic();
+}
+function toMenu() {
+  Sound.stopMusic();
+  G.state = 'menu';
+  G.meteors.length = 0; G.pulses.length = 0; G.powerups.length = 0; G.gemsOnRing.length = 0;
+  G.slowT = 0; G.magnetT = 0; G.shield = false; G.comboT = 0; G.diff = 0;
+  UI.hud(false);
+  UI.refreshTitle();
+  UI.show('title');
+}
+function toggleMute() {
+  const s = save().settings;
+  const on = !(s.sfx || s.music);
+  s.sfx = on; s.music = on;
+  Store.commit(); Sound.apply(); UI.syncSettings();
+  toast(on ? 'Sound on' : 'Sound muted');
+}
+
+/* =====================================================================
+   12. Input
+   ===================================================================== */
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  Sound.unlock();
+  if (G.state === 'playing') flip();
+}, { passive: false });
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+$('scrOver').addEventListener('pointerdown', e => {
+  if (e.target.closest('button')) return;
+  e.preventDefault();
+  retry();
+});
+
+const FLIP_KEYS = new Set(['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyZ', 'KeyX', 'KeyA', 'KeyD', 'KeyW', 'KeyS']);
+window.addEventListener('keydown', e => {
+  if (halted) return;
+  Sound.unlock();
+  const tag = e.target && e.target.tagName;
+  const onControl = tag === 'BUTTON' || tag === 'INPUT';
+  // Let focused buttons / sliders handle their own activation keys.
+  if (onControl && (e.code === 'Space' || e.code === 'Enter' || (tag === 'INPUT' && e.code.startsWith('Arrow')))) return;
+
+  if (G.state === 'playing') {
+    if (FLIP_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) flip(); return; }
+    if (e.code === 'KeyP' || e.code === 'Escape') { e.preventDefault(); pause(); return; }
+    if (e.code === 'KeyR' && !e.repeat) { e.preventDefault(); startRun(); return; }
+  } else if (G.state === 'paused') {
+    if (e.code === 'KeyP' || e.code === 'Escape') { e.preventDefault(); resume(); return; }
+    if (e.code === 'KeyR' && !e.repeat) { e.preventDefault(); startRun(); return; }
+  } else if (G.state === 'over') {
+    if ((e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyR') && !e.repeat) { e.preventDefault(); retry(); return; }
+    if (e.code === 'Escape') { e.preventDefault(); toMenu(); return; }
+  } else if (G.state === 'menu') {
+    if (UI.current === 'title' && (e.code === 'Space' || e.code === 'Enter') && !e.repeat) { e.preventDefault(); startRun(); return; }
+    if (e.code === 'Escape' && UI.current !== 'title') { e.preventDefault(); UI.show('title'); return; }
+  }
+  if (e.code === 'KeyM' && !e.repeat) toggleMute();
+});
+
+const click = (id, fn) => $(id).addEventListener('click', () => { Sound.unlock(); Sound.sfx.ui(); fn(); });
+click('btnPlay', () => { if (G.state === 'menu') startRun(); });
+click('btnHangar', () => { UI.buildHangar(); UI.show('hangar'); });
+click('btnSettings', () => { UI.syncSettings(); UI.show('settings'); });
+click('btnHangarBack', () => { UI.refreshTitle(); UI.show('title'); });
+click('btnSettingsBack', () => UI.show('title'));
+click('btnResume', resume);
+click('btnPauseRestart', () => { if (G.state === 'paused') startRun(); });
+click('btnPauseMenu', () => { if (G.state === 'paused') toMenu(); });
+click('btnRetry', retry);
+click('btnOverMenu', () => { if (G.state === 'over') toMenu(); });
+$('btnPause').addEventListener('click', () => { if (G.state === 'playing') pause(); });
+$('btnPause').addEventListener('pointerdown', e => e.stopPropagation());
+
+click('optSfx', () => { const s = save().settings; s.sfx = !s.sfx; Store.commit(); Sound.apply(); UI.syncSettings(); });
+click('optMusic', () => { const s = save().settings; s.music = !s.music; Store.commit(); Sound.apply(); UI.syncSettings(); });
+$('optVol').addEventListener('input', e => {
+  const v = clamp(Number(e.target.value) / 100, 0, 1);
+  save().settings.volume = Number.isFinite(v) ? v : 0.7;
+  Sound.unlock(); Sound.apply();
+});
+$('optShake').addEventListener('input', e => {
+  const v = clamp(Number(e.target.value) / 100, 0, 1);
+  save().settings.shake = Number.isFinite(v) ? v : 1;
+  Fx.trauma = 0; Fx.shake(0.4);
+});
+['optVol', 'optShake'].forEach(id => $(id).addEventListener('change', () => { Store.commit(); Sound.sfx.ui(); }));
+
+let resetArmed = 0;
+click('btnReset', () => {
+  const b = $('btnReset');
+  if (performance.now() - resetArmed > 3000) {
+    resetArmed = performance.now();
+    b.textContent = 'Confirm';
+    setTimeout(() => { if (performance.now() - resetArmed >= 3000) b.textContent = 'Reset'; }, 3050);
+    return;
+  }
+  resetArmed = 0;
+  b.textContent = 'Reset';
+  Store.reset();
+  UI.refreshTitle(); UI.syncSettings();
+  toast(Store.writable ? 'Progress reset' : 'Progress reset for this session only', Store.writable ? '' : 'warn');
+});
+
+// Auto-pause when the player cannot be paying attention.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { pause(); Sound.suspend(); }
+});
+window.addEventListener('blur', () => pause());
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 120));
+
+// Cross-tab safety: if another tab saved, reload its data instead of clobbering it later.
+window.addEventListener('storage', e => {
+  if (e.key !== SAVE_KEY || e.newValue == null) return;
+  try {
+    const { save: fresh } = sanitize(JSON.parse(e.newValue));
+    Store.data = fresh;
+    if (G.state === 'menu') UI.refreshTitle();
+  } catch (_) { /* ignore a malformed write from elsewhere; ours stays valid */ }
+});
+
+/* =====================================================================
+   13. Main loop
+   ===================================================================== */
+let last = performance.now(), acc = 0;
+function frame(now) {
+  if (halted) return;
+  requestAnimationFrame(frame);
+  try {
+    let rdt = (now - last) / 1000;
+    last = now;
+    if (!(rdt > 0)) rdt = 0;
+    rdt = Math.min(rdt, 0.1); // a long stall must not teleport hazards through the player
+
+    Fx.update(rdt);
+    let scale = 1;
+    if (G.state === 'paused') scale = 0;
+    else if (G.state === 'dying' || G.state === 'over') scale = G.timeScale;
+    if (G.state === 'playing' && G.resumeRamp > 0) { G.resumeRamp = Math.max(0, G.resumeRamp - rdt); scale = lerp(1, 0.25, G.resumeRamp / 0.7); }
+    if (G.hitstop > 0) { G.hitstop -= rdt; scale = 0; }
+    if (G.state === 'dying' || G.state === 'over') G.timeScale = Math.min(1, G.timeScale + rdt * 0.5);
+
+    acc += rdt * scale;
+    let n = 0;
+    while (acc >= STEP && n < 16) { update(STEP); updateFx(STEP); acc -= STEP; n++; }
+    if (n >= 16) acc = 0;
+    if (scale === 0 && G.state !== 'paused') updateFx(rdt * 0.2);
+
+    if (G.state === 'dying') {
+      G.dyingT += rdt;
+      if (G.dyingT > 0.8) { G.state = 'over'; UI.showOver(); }
+    }
+    if (G.state === 'playing') UI.updateHud();
+    render(now);
+  } catch (err) {
+    fatal(err);
+  }
+}
+
+/* =====================================================================
+   14. Boot
+   ===================================================================== */
+const loadStatus = Store.load();
+resize();
+UI.refreshTitle();
+UI.syncSettings();
+UI.show('title');
+G.trail.length = 0;
+if (loadStatus === 'corrupt') toast('Your save file was unreadable. A backup was kept and a fresh save started.', 'warn', 6000);
+else if (loadStatus === 'repaired') { toast('Some save data was invalid and has been repaired.', 'warn', 4500); Store.commit(); }
+else if (loadStatus === 'unavailable' || loadStatus === 'newer') toast(Store.reason, 'warn', 6000);
+requestAnimationFrame(t => { last = t; frame(t); });
+
+// Test hook (read-only snapshot) for automated checks; harmless in production.
+window.__orbital = { get state() { return G.state; }, get score() { return Math.floor(G.score); }, get save() { return JSON.parse(JSON.stringify(save())); } };
+})();
