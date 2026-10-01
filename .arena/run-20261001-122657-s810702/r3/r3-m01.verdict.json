@@ -1,0 +1,11 @@
+{
+  "match": "r3-m01",
+  "scores": {
+    "a007": {"correctness": 9, "completeness": 9, "specificity": 9, "robustness": 9, "clarity": 9, "fatal": false},
+    "a008": {"correctness": 9, "completeness": 10, "specificity": 9, "robustness": 9, "clarity": 8, "fatal": false}
+  },
+  "winner": "a008",
+  "reason": "Both files run error-free in headless Chromium and fixed every attack, but a008 meets the polish and progression requirements more fully: hit-stop, phases, shields, achievements and a richer unlock economy, plus verified instant tap-to-skip restart, against a007's thinner skins-plus-levels loop.",
+  "survived": ["restart gated ~1.2 s behind death animation (now skippable from 0.4 s)", "second tab flipping core/mute mid-run (G.skinId and per-tab Sound.muted)", "HUD permanently aria-hidden (toggled, plus live region)", "Enter not starting a run from title (now accepted)"],
+  "standing": {"a007": [], "a008": []}
+}

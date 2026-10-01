@@ -170,10 +170,10 @@
      "how": "Optimise for the fastest route to something usable today. Cut anything that does not move the result."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r2/r2-m01.a007.solution.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r3/r3-m01.a007.solution.md",
+   "alive": false,
+   "eliminated_in": 3,
+   "eliminated_by": "a008",
    "byes": 0
   },
   "a008": {
@@ -194,7 +194,7 @@
      "how": "Name the real trade-offs, choose for the user's most likely constraints, and say plainly what that choice gives up."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r2/r2-m02.a008.solution.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r3/r3-m01.a008.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -361,18 +361,26 @@
      "id": "r3-m01",
      "a": "a007",
      "b": "a008",
-     "winner": null,
-     "loser": null,
-     "reason": null,
-     "survived": [],
-     "scores": null,
-     "source": null
+     "winner": "a008",
+     "loser": "a007",
+     "reason": "Both files run error-free in headless Chromium and fixed every attack, but a008 meets the polish and progression requirements more fully: hit-stop, phases, shields, achievements and a richer unlock economy, plus verified instant tap-to-skip restart, against a007's thinner skins-plus-levels loop.",
+     "survived": [
+      "restart gated ~1.2 s behind death animation (now skippable from 0.4 s)",
+      "second tab flipping core/mute mid-run (G.skinId and per-tab Sound.muted)",
+      "HUD permanently aria-hidden (toggled, plus live region)",
+      "Enter not starting a run from title (now accepted)"
+     ],
+     "scores": {
+      "a007": 90.0,
+      "a008": 91.5
+     },
+     "source": "judge"
     }
    ],
    "bye": null,
-   "closed": false
+   "closed": true
   }
  ],
- "champion": null,
+ "champion": "a008",
  "final": null
 }
