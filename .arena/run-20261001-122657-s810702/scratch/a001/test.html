@@ -78,7 +78,7 @@ h2{font-size:22px;font-weight:900;letter-spacing:-.01em}
   color:#2a1a00;background:linear-gradient(90deg,#ffe29a,var(--gold));box-shadow:0 0 24px rgba(255,209,102,.55);animation:glow 1.2s ease-in-out infinite alternate}
 @keyframes glow{to{box-shadow:0 0 40px rgba(255,209,102,.9)}}
 .cause{color:var(--dim);font-size:14px;font-weight:700;margin-top:4px}
-.unlock{margin:16px 0 4px;text-align:left;font-size:13px;font-weight:700;color:var(--dim)}
+.unlock{margin:16px 0 14px;text-align:left;font-size:13px;font-weight:700;color:var(--dim)}
 .unlock .bar{height:8px;margin-top:8px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden}
 .unlock .bar i{display:block;height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,var(--gold),#ff9f43);transition:width .7s cubic-bezier(.2,.8,.2,1)}
 .over-stats{margin-top:16px}
@@ -419,6 +419,8 @@ h2{font-size:22px;font-weight:900;letter-spacing:-.01em}
   /* ---------------- Game flow ---------------- */
   function showScreen(id) {
     for (const s of ['menu', 'over', 'skins']) $(s).classList.toggle('show', s === id);
+    const ae = document.activeElement;
+    if (ae && ae.closest && ae.closest('.screen') && !ae.closest('.screen.show')) ae.blur();
     document.body.classList.toggle('playing', id === null);
   }
 
@@ -876,7 +878,7 @@ h2{font-size:22px;font-weight:900;letter-spacing:-.01em}
   });
   window.addEventListener('keydown', (e) => {
     const k = e.key;
-    const onButton = e.target instanceof HTMLButtonElement && e.target.offsetParent !== null;
+    const onButton = e.target instanceof HTMLButtonElement && !!e.target.closest('.screen.show, .hud');
     if ((k === ' ' || k === 'Enter') && onButton) return; // let focused buttons handle themselves
     if (k === ' ' || k === 'ArrowUp' || k === 'w' || k === 'W' || k === 'Enter') {
       e.preventDefault();

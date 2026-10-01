@@ -20,7 +20,7 @@ const { chromium } = require('playwright');
   });
   await pg.waitForTimeout(150);
   await pg.screenshot({path:'mid.png'});
-  await pg.evaluate(()=>{const s=JSON.parse(localStorage.getItem('orbithop.save.v1'));s.gems=500;localStorage.setItem('orbithop.save.v1',JSON.stringify(s));});
+  await pg.addInitScript(()=>{if(!sessionStorage.x){sessionStorage.x=1;localStorage.setItem('orbithop.save.v1',JSON.stringify({best:35,gems:500,runs:1,owned:['ion'],skin:'ion'}));}});
   await pg.reload(); await pg.click('#menuSkinsBtn'); await pg.click('.skin:nth-child(4)'); await pg.click('.skin:nth-child(6)');
   await pg.waitForTimeout(400); await pg.screenshot({path:'skins.png'});
   console.log(await pg.evaluate(()=>localStorage.getItem('orbithop.save.v1')));
