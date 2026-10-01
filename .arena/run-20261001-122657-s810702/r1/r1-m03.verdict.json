@@ -1,0 +1,15 @@
+{
+  "match": "r1-m03",
+  "scores": {
+    "a006": {"correctness": 9, "completeness": 8, "specificity": 9, "robustness": 9, "clarity": 9, "fatal": false},
+    "a003": {"correctness": 9, "completeness": 9, "specificity": 9, "robustness": 9, "clarity": 8, "fatal": false}
+  },
+  "winner": "a003",
+  "reason": "Both games run without errors and fixed every attack (checked in headless Chromium), but a003 meets the 'highly polished' juice and progression requirements more fully: trauma shake with shockwaves, an adaptive layered beat, six varied unlock goals with progress bars, and hardened multi-tab/blocked-storage saves, against a006's thinner single-axis shard unlocks and simpler presentation.",
+  "survived": [
+    "slow touch restart: now about 0.65 s by taps alone (verified tap->results->play)",
+    "arrows/WASD not starting from menu: guard removed, ArrowUp now starts a run (verified)",
+    "shared voice cap starving music: split into separate 24 SFX / 16 music budgets"
+  ],
+  "standing": {"a006": [], "a003": []}
+}

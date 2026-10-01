@@ -1,0 +1,1027 @@
+
+(() => {
+  'use strict';
+
+  /* ------------------------------------------------------------------ *
+   * Math helpers
+   * ------------------------------------------------------------------ */
+  const TAU = Math.PI * 2;
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+  const easeOutBack = (t) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+  const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function hslToRgb(h, s, l) {
+    h = ((h % 360) + 360) % 360 / 360;
+    const f = (n) => {
+      const k = (n + h * 12) % 12;
+      const a = s * Math.min(l, 1 - l);
+      return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))));
+    };
+    return [f(0), f(8), f(4)];
+  }
+  const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+
+  /* ------------------------------------------------------------------ *
+   * Tuning (all distances are fractions of M = min(1.12 * width, height, 1000 px))
+   * ------------------------------------------------------------------ */
+  const T = {
+    rIn: 0.23, rOut: 0.34,        // orbit radii
+    playerR: 0.017, hazardR: 0.022, orbR: 0.013,
+    hitScale: 0.8,                // hazard hitbox = 80% of drawn size (forgiving)
+    pickupPad: 0.012,             // extra orb pickup reach
+    hopTime: 0.10,                // seconds to swap orbits
+    omega0: 1.7, omegaStep: 0.16, omegaMax: 2.9, // angular speed (rad/s) per lap; capped from lap 9
+    heatLap: 9, heatLaps: 20,     // after the speed cap, forced swaps keep rising from lap 9 to lap 29
+    ahead: 4.4,                   // spawn content this far ahead (rad)
+    behind: 0.6,                  // discard content this far behind (rad)
+    passAngle: 0.2,               // hazard counts as dodged this far behind (rad)
+    orbMissAngle: 0.3,            // orb counts as missed this far behind (rad)
+    closeWindow: 0.26,            // hop within this angle before a shard = close call
+    startGap: 2.2,                // empty arc before the first shard (rad)
+    comboCap: 10
+  };
+  const HAZARD_RGB = [255, 61, 110];
+  const GOLD_RGB = [255, 209, 102];
+  const START_ANGLE = -Math.PI / 2;
+
+  /* ------------------------------------------------------------------ *
+   * Unlockable cores (skins)
+   * ------------------------------------------------------------------ */
+  const SKINS = [
+    { id: 'core',  name: 'Core',  rgb: [232, 242, 255], stat: null,        target: 0,   label: 'Default' },
+    { id: 'ember', name: 'Ember', rgb: [255, 150, 80],  stat: 'best',      target: 50,  label: 'Score 50' },
+    { id: 'tide',  name: 'Tide',  rgb: [96, 240, 210],  stat: 'totalOrbs', target: 150, label: 'Collect 150 orbs' },
+    { id: 'volt',  name: 'Volt',  rgb: [226, 255, 90],  stat: 'maxLap',    target: 5,   label: 'Reach lap 5' },
+    { id: 'bloom', name: 'Bloom', rgb: [255, 128, 214], stat: 'games',     target: 20,  label: 'Play 20 runs' },
+    { id: 'prism', name: 'Prism', rgb: null,            stat: 'best',      target: 250, label: 'Score 250' }
+  ];
+  const STAT_NOUN = { best: 'best score', totalOrbs: 'orbs collected', maxLap: 'top lap', games: 'runs played' };
+  const skinById = (id) => SKINS.find((s) => s.id === id) || SKINS[0];
+  const skinRgb = (sk, t) => sk.rgb || hslToRgb(Math.round((t * 90) / 10) * 10, 1, 0.72);
+
+  /* ------------------------------------------------------------------ *
+   * Save system (localStorage, validated, failure-tolerant)
+   * ------------------------------------------------------------------ */
+  const SAVE_KEY = 'orbit-shift-save-v1';
+  function loadSave() {
+    const s = { best: 0, totalOrbs: 0, maxLap: 0, games: 0, bestCombo: 0, skin: 'core', muted: false, unlocked: ['core'] };
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { d = null; }
+    if (d && typeof d === 'object') {
+      for (const k of ['best', 'totalOrbs', 'maxLap', 'games', 'bestCombo']) {
+        if (Number.isFinite(d[k]) && d[k] >= 0) s[k] = Math.floor(d[k]);
+      }
+      if (typeof d.muted === 'boolean') s.muted = d.muted;
+      if (Array.isArray(d.unlocked)) {
+        s.unlocked = Array.from(new Set(['core'].concat(d.unlocked.filter((id) => SKINS.some((k) => k.id === id)))));
+      }
+      if (typeof d.skin === 'string' && s.unlocked.includes(d.skin)) s.skin = d.skin;
+    }
+    return s;
+  }
+  const save = loadSave();
+  function persist(data = save) {
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { /* storage full or blocked: play on without saving */ }
+  }
+  const skinUnlockedByStats = (sk) => sk.stat === null || save[sk.stat] >= sk.target;
+  function collectUnlocks() {
+    const fresh = [];
+    for (const sk of SKINS) {
+      if (!save.unlocked.includes(sk.id) && skinUnlockedByStats(sk)) { save.unlocked.push(sk.id); fresh.push(sk); }
+    }
+    return fresh;
+  }
+  collectUnlocks();
+  persist();
+
+  /* ------------------------------------------------------------------ *
+   * Procedural audio (Web Audio API, no sample files)
+   * ------------------------------------------------------------------ */
+  const Audio = {
+    ctx: null, master: null, noiseBuf: null,
+    ensure() {
+      if (!this.ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        try { this.ctx = new AC(); } catch (e) { this.ctx = null; return; }
+        const comp = this.ctx.createDynamicsCompressor();
+        comp.threshold.value = -16; comp.knee.value = 12; comp.ratio.value = 4;
+        comp.attack.value = 0.003; comp.release.value = 0.2;
+        comp.connect(this.ctx.destination);
+        this.master = this.ctx.createGain();
+        this.master.gain.value = save.muted ? 0 : 0.6;
+        this.master.connect(comp);
+        const len = Math.floor(this.ctx.sampleRate * 1);
+        this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+        const ch = this.noiseBuf.getChannelData(0);
+        for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1;
+      }
+      if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+    },
+    setMuted(m) {
+      if (this.master) this.master.gain.setTargetAtTime(m ? 0 : 0.6, this.ctx.currentTime, 0.02);
+    },
+    live() { return this.ctx !== null && !save.muted; },
+    tone({ f = 440, f2 = 0, dur = 0.15, type = 'sine', vol = 0.3, delay = 0, attack = 0.004 }) {
+      if (!this.live()) return;
+      const c = this.ctx, t = c.currentTime + delay;
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(f, t);
+      if (f2 > 0) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(this.master);
+      o.start(t); o.stop(t + dur + 0.03);
+    },
+    noise({ dur = 0.3, vol = 0.3, type = 'lowpass', f = 1200, f2 = 0, q = 1, delay = 0 }) {
+      if (!this.live()) return;
+      const c = this.ctx, t = c.currentTime + delay;
+      const src = c.createBufferSource(); src.buffer = this.noiseBuf;
+      const filt = c.createBiquadFilter(); filt.type = type; filt.Q.value = q;
+      filt.frequency.setValueAtTime(f, t);
+      if (f2 > 0) filt.frequency.exponentialRampToValueAtTime(f2, t + dur);
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(filt); filt.connect(g); g.connect(this.master);
+      src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.03);
+    }
+  };
+  const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31];
+  const note = (semi, base = 523.25) => base * Math.pow(2, semi / 12);
+  const Sfx = {
+    hop() { Audio.tone({ f: 300, f2: 640, dur: 0.08, type: 'sine', vol: 0.16 }); },
+    orb(combo, gold) {
+      const f = note(PENTA[Math.min(combo - 1, PENTA.length - 1)]);
+      Audio.tone({ f, dur: 0.24, type: 'triangle', vol: 0.22 });
+      Audio.tone({ f: f * 2, dur: 0.14, type: 'sine', vol: 0.08, delay: 0.025 });
+      if (gold) Audio.tone({ f: f * 1.5, dur: 0.3, type: 'triangle', vol: 0.12, delay: 0.06 });
+    },
+    close() {
+      Audio.noise({ dur: 0.2, vol: 0.22, type: 'bandpass', f: 700, f2: 4200, q: 2.5 });
+      Audio.tone({ f: 1320, f2: 1980, dur: 0.09, type: 'square', vol: 0.04, delay: 0.03 });
+    },
+    comboBreak() { Audio.tone({ f: 330, f2: 170, dur: 0.16, type: 'triangle', vol: 0.1 }); },
+    lap(lap) {
+      const base = 392 * Math.pow(2, ((lap - 2) % 4) * 2 / 12);
+      [0, 4, 7, 12].forEach((s, i) => Audio.tone({ f: note(s, base), dur: 0.22, type: 'triangle', vol: 0.16, delay: i * 0.07 }));
+      Audio.noise({ dur: 0.5, vol: 0.08, type: 'highpass', f: 3000, f2: 9000, q: 0.7 });
+    },
+    death() {
+      Audio.noise({ dur: 0.7, vol: 0.55, type: 'lowpass', f: 3000, f2: 90, q: 1 });
+      Audio.tone({ f: 240, f2: 38, dur: 0.6, type: 'sawtooth', vol: 0.22 });
+      Audio.tone({ f: 120, f2: 30, dur: 0.8, type: 'sine', vol: 0.4 });
+    },
+    best() { [0, 4, 7, 11, 14].forEach((s, i) => Audio.tone({ f: note(s, 440), dur: 0.35, type: 'triangle', vol: 0.14, delay: 0.12 + i * 0.08 })); },
+    unlock() { [7, 12, 16, 19, 24].forEach((s, i) => Audio.tone({ f: note(s, 440), dur: 0.4, type: 'sine', vol: 0.13, delay: 0.5 + i * 0.06 })); },
+    ui() { Audio.tone({ f: 880, f2: 1100, dur: 0.05, type: 'sine', vol: 0.07 }); },
+    start() { Audio.tone({ f: 220, f2: 660, dur: 0.25, type: 'triangle', vol: 0.16 }); Audio.noise({ dur: 0.3, vol: 0.06, type: 'highpass', f: 2000, f2: 8000 }); }
+  };
+
+  /* ------------------------------------------------------------------ *
+   * Canvas & viewport
+   * ------------------------------------------------------------------ */
+  const cv = document.getElementById('game');
+  const ctx = cv.getContext('2d');
+  let W = 0, H = 0, DPR = 1, M = 0, CX = 0, CY = 0;
+  let RIN = 0, ROUT = 0, PR = 0, HR = 0, OR = 0;
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = Math.max(1, Math.round(W * DPR));
+    cv.height = Math.max(1, Math.round(H * DPR));
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    M = Math.min(W * 1.12, H, 1000); // portrait phones: use a little more width; decor still fits
+    CX = W / 2; CY = H / 2;
+    RIN = T.rIn * M; ROUT = T.rOut * M;
+    PR = T.playerR * M; HR = T.hazardR * M; OR = T.orbR * M;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Pre-rendered additive glow sprites, cached per colour.
+  const glowCache = new Map();
+  function glowSprite(c) {
+    const key = c.join(',');
+    let s = glowCache.get(key);
+    if (s) return s;
+    s = document.createElement('canvas');
+    s.width = s.height = 128;
+    const g = s.getContext('2d');
+    const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gr.addColorStop(0, rgba(c, 0.9));
+    gr.addColorStop(0.22, rgba(c, 0.42));
+    gr.addColorStop(0.5, rgba(c, 0.1));
+    gr.addColorStop(1, rgba(c, 0));
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+    glowCache.set(key, s);
+    return s;
+  }
+  function drawGlow(x, y, radius, c, alpha) {
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(glowSprite(c), x - radius, y - radius, radius * 2, radius * 2);
+    ctx.globalAlpha = 1;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Effects: particles, ripples, floating text, shake, flash
+   * ------------------------------------------------------------------ */
+  const particles = [];
+  const ripples = [];
+  const texts = [];
+  const FX = { trauma: 0, flash: 0, flashRgb: [255, 255, 255], shakeX: 0, shakeY: 0 };
+  const MAX_PARTICLES = 700;
+
+  function burst(x, y, n, c, speed, size, life, spread = TAU, dir = 0) {
+    for (let i = 0; i < n && particles.length < MAX_PARTICLES; i++) {
+      const a = dir + (Math.random() - 0.5) * spread;
+      const v = speed * M * rand(0.25, 1);
+      particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: life * rand(0.6, 1), max: life, size: size * M * rand(0.5, 1), c });
+    }
+  }
+  function ripple(x, y, r0, r1, c, life, w) { ripples.push({ x, y, r0, r1, c, life, max: life, w }); }
+  function floatText(text, x, y, c, size, life = 0.9) { texts.push({ text, x, y, c, size, life, max: life }); }
+  function addTrauma(v) { FX.trauma = Math.min(1, FX.trauma + v); }
+  function flash(c, v) { FX.flashRgb = c; FX.flash = Math.max(FX.flash, reducedMotion ? v * 0.35 : v); }
+
+  function updateFx(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life -= dt;
+      if (p.life <= 0) { particles[i] = particles[particles.length - 1]; particles.pop(); continue; }
+      const drag = Math.pow(0.04, dt);
+      p.vx *= drag; p.vy *= drag;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+    }
+    for (let i = ripples.length - 1; i >= 0; i--) { ripples[i].life -= dt; if (ripples[i].life <= 0) ripples.splice(i, 1); }
+    for (let i = texts.length - 1; i >= 0; i--) {
+      const t = texts[i]; t.life -= dt; t.y -= M * 0.06 * dt;
+      if (t.life <= 0) texts.splice(i, 1);
+    }
+    FX.trauma = Math.max(0, FX.trauma - 1.5 * dt);
+    FX.flash = Math.max(0, FX.flash - 3 * dt);
+    const shake = FX.trauma * FX.trauma * M * 0.035 * (reducedMotion ? 0.2 : 1);
+    FX.shakeX = (Math.random() * 2 - 1) * shake;
+    FX.shakeY = (Math.random() * 2 - 1) * shake;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Game state
+   * ------------------------------------------------------------------ */
+  const G = {
+    state: 'menu',    // menu | play | paused | dying | over
+    t: 0, angle: START_ANGLE, ring: 1, rPos: 1, hop0: 1, hopT: 1,
+    lastHopAngle: -1e9, lastHopFrom: -1,
+    score: 0, orbs: 0, combo: 0, bestCombo: 0, closes: 0, lap: 1,
+    hazards: [], orbList: [], nextA: 0, nextRing: 0,
+    timeScale: 1, dyingT: 0, overAt: 0, scorePop: 0, banner: null,
+    hue: 205, hueTarget: 205, trail: [], skin: skinById(save.skin), realT: 0,
+    runOpen: false, bankedOrbs: 0, startBest: 0   // save bookkeeping for the current run
+  };
+
+  function resetRun() {
+    G.t = 0; G.angle = START_ANGLE; G.ring = 1; G.rPos = 1; G.hop0 = 1; G.hopT = 1;
+    G.lastHopAngle = -1e9; G.lastHopFrom = -1;
+    G.score = 0; G.orbs = 0; G.combo = 0; G.bestCombo = 0; G.closes = 0; G.lap = 1;
+    G.runOpen = false; G.bankedOrbs = 0; G.startBest = save.best;
+    G.hazards.length = 0; G.orbList.length = 0;
+    G.nextA = START_ANGLE + T.startGap; G.nextRing = Math.random() < 0.5 ? 0 : 1;
+    G.timeScale = 1; G.dyingT = 0; G.scorePop = 0; G.banner = null;
+    G.hue = 205; G.hueTarget = 205; G.trail.length = 0;
+    G.skin = skinById(save.skin);
+    particles.length = 0; ripples.length = 0; texts.length = 0;
+  }
+
+  const ringRadius = (ringIndex) => lerp(RIN, ROUT, ringIndex);
+  const playerRadius = () => lerp(RIN, ROUT, G.rPos);
+  const omegaFor = (lap) => Math.min(T.omegaMax, T.omega0 + T.omegaStep * (lap - 1));
+  // "Heat" (0..1) keeps the run escalating once speed is capped. It never lowers the
+  // minimum gaps (the fairness floor); it only raises the share of forced swaps and
+  // pulls the longer, easier gaps down toward that floor.
+  const heatFor = (lap) => clamp((lap - T.heatLap) / T.heatLaps, 0, 1);
+  const lapBonus = (lap) => Math.min(25, 5 + 2 * (lap - 2)); // lap 2: +5, lap 3: +7 ... lap 12 on: +25
+  const polar = (a, r) => [CX + Math.cos(a) * r, CY + Math.sin(a) * r];
+
+  /* Content generator. Each "beat" puts one shard on one orbit. The gap to the
+   * next beat is longer when the next shard forces an orbit swap, so every
+   * sequence is physically survivable at max speed (see tuning notes). */
+  function generate() {
+    const limit = G.angle + T.ahead;
+    while (G.nextA < limit) {
+      const ring = G.nextRing;
+      const lapK = Math.max(0.85, 1 - 0.03 * (G.lap - 1));
+      const heat = heatFor(G.lap);
+      const swap = Math.random() < 0.55 + 0.25 * heat;
+      const nxt = swap ? 1 - ring : ring;
+      const gap = (swap ? rand(0.85, 1.15 - 0.15 * heat) : rand(0.62, 0.9 - 0.15 * heat)) * lapK;
+      G.hazards.push({ a: G.nextA, ring, born: G.t, passed: false });
+      const r = Math.random();
+      if (gap >= 0.8 && r < 0.2) {
+        // Gold orb on the risky orbit: hop over, grab it, hop back before the next shard.
+        G.orbList.push({ a: G.nextA + gap * 0.5, ring: nxt, gold: true, born: G.t, got: false, missed: false, t: 0 });
+      } else if (r < 0.65) {
+        // Regular orb on the safe line.
+        G.orbList.push({ a: G.nextA + gap * 0.5, ring: 1 - nxt, gold: false, born: G.t, got: false, missed: false, t: 0 });
+      }
+      G.nextA += gap;
+      G.nextRing = nxt;
+    }
+  }
+
+  function hop() {
+    G.lastHopFrom = G.ring;
+    G.lastHopAngle = G.angle;
+    G.ring = 1 - G.ring;
+    G.hop0 = G.rPos;
+    G.hopT = 0;
+    const [x, y] = polar(G.angle, playerRadius());
+    const sk = skinRgb(G.skin, G.realT);
+    ripple(x, y, PR, PR * 3.2, sk, 0.28, 2);
+    burst(x, y, 6, sk, 0.25, 0.006, 0.3, 1.2, G.angle + (G.ring === 1 ? 0 : Math.PI));
+    Sfx.hop();
+  }
+
+  function setBanner(text, sub) { G.banner = { text, sub, life: 1.6, max: 1.6 }; }
+
+  function onLap() {
+    G.hueTarget = (205 + (G.lap - 1) * 47) % 360;
+    const bonus = lapBonus(G.lap);
+    G.score += bonus;
+    G.scorePop = 1;
+    // Say only what actually changed this lap.
+    let what = '';
+    if (omegaFor(G.lap) > omegaFor(G.lap - 1)) what = ' · faster';
+    else if (heatFor(G.lap) > heatFor(G.lap - 1)) what = heatFor(G.lap) >= 1 ? ' · max difficulty' : ' · more swaps';
+    setBanner(`Lap ${G.lap}`, `+${bonus}${what}`);
+    const acc = hslToRgb(G.hueTarget, 0.85, 0.65);
+    for (const ringI of [0, 1]) ripple(CX, CY, ringRadius(ringI), ringRadius(ringI) + M * 0.08, acc, 0.7, 3);
+    addTrauma(0.25);
+    flash(acc, 0.18);
+    Sfx.lap(G.lap);
+  }
+
+  function step(dt) {
+    G.t += dt;
+    G.angle += omegaFor(G.lap) * dt;
+    if (G.hopT < 1) G.hopT = Math.min(1, G.hopT + dt / T.hopTime);
+    G.rPos = lerp(G.hop0, G.ring, easeOutCubic(G.hopT));
+
+    const lap = 1 + Math.floor((G.angle - START_ANGLE) / TAU);
+    if (lap > G.lap) { G.lap = lap; onLap(); }
+
+    generate();
+
+    const [px, py] = polar(G.angle, playerRadius());
+    const hit = PR + HR * T.hitScale;
+
+    for (const h of G.hazards) {
+      if (h.passed) continue;
+      const [hx, hy] = polar(h.a, ringRadius(h.ring));
+      const dx = hx - px, dy = hy - py;
+      if (dx * dx + dy * dy < hit * hit) { die(hx, hy); return; }
+      if (G.angle - h.a > T.passAngle) {
+        h.passed = true;
+        G.score += 1;
+        const hopLead = h.a - G.lastHopAngle;
+        if (G.lastHopFrom === h.ring && hopLead >= 0 && hopLead < T.closeWindow) {
+          G.score += 2; G.closes += 1; G.scorePop = 1;
+          floatText('CLOSE +2', hx, hy - M * 0.02, [255, 255, 255], 0.03);
+          burst(hx, hy, 14, HAZARD_RGB, 0.35, 0.006, 0.45);
+          ripple(hx, hy, HR, HR * 3, [255, 255, 255], 0.3, 2);
+          G.timeScale = 0.55;
+          addTrauma(0.12);
+          Sfx.close();
+        }
+      }
+    }
+    for (let i = G.hazards.length - 1; i >= 0; i--) if (G.angle - G.hazards[i].a > T.behind) G.hazards.splice(i, 1);
+
+    const reach = PR + OR + T.pickupPad * M;
+    for (const o of G.orbList) {
+      if (o.got || o.missed) continue;
+      const [ox, oy] = polar(o.a, ringRadius(o.ring));
+      const dx = ox - px, dy = oy - py;
+      if (dx * dx + dy * dy < reach * reach) {
+        o.got = true;
+        G.orbs += 1;
+        G.combo += 1;
+        G.bestCombo = Math.max(G.bestCombo, G.combo);
+        const pts = Math.min(G.combo, T.comboCap) * (o.gold ? 2 : 1);
+        G.score += pts; G.scorePop = 1;
+        const c = o.gold ? GOLD_RGB : hslToRgb(G.hue, 0.6, 0.8);
+        burst(ox, oy, o.gold ? 26 : 16, c, o.gold ? 0.5 : 0.38, 0.007, 0.55);
+        ripple(ox, oy, OR, OR * 4, c, 0.35, 2);
+        floatText(`+${pts}`, ox, oy - M * 0.025, c, o.gold ? 0.036 : 0.03);
+        flash(c, o.gold ? 0.12 : 0.05);
+        if (o.gold) addTrauma(0.1);
+        Sfx.orb(G.combo, o.gold);
+      } else if (G.angle - o.a > T.orbMissAngle) {
+        o.missed = true;
+        if (o.gold) continue; // gold is an optional risk: skipping it never costs the combo
+        if (G.combo >= 2) {
+          floatText('combo lost', px, py - M * 0.03, [160, 168, 190], 0.022, 0.7);
+          Sfx.comboBreak();
+        }
+        G.combo = 0;
+      }
+    }
+    for (let i = G.orbList.length - 1; i >= 0; i--) if (G.angle - G.orbList[i].a > T.behind) G.orbList.splice(i, 1);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Run lifecycle
+   * ------------------------------------------------------------------ */
+  let lastResult = null;
+
+  /* Save bookkeeping. A run is "open" from start() until it ends by death, restart,
+   * quitting to the menu, or the page closing. Whatever way it ends, its progress is
+   * kept, and it counts as exactly one run played. */
+  function bankRun() {
+    // Fold the run's progress into the save. Safe to call any number of times.
+    save.totalOrbs += G.orbs - G.bankedOrbs;
+    G.bankedOrbs = G.orbs;
+    save.maxLap = Math.max(save.maxLap, G.lap);
+    save.bestCombo = Math.max(save.bestCombo, G.bestCombo);
+    save.best = Math.max(save.best, G.score);
+  }
+  function endRun() {
+    if (!G.runOpen) return [];
+    G.runOpen = false;
+    bankRun();
+    save.games += 1;
+    const fresh = collectUnlocks();
+    persist();
+    return fresh;
+  }
+  function checkpoint() {
+    // Pause, hidden tab or page close: store the run as if it ended now, without ending it.
+    // The stored copy counts the open run as played; the in-memory count is untouched, so
+    // ending the run later writes the same total (no double count). Unlocks earned by the
+    // stored stats are granted by loadSave() on the next visit.
+    if (!G.runOpen) return;
+    bankRun();
+    persist(Object.assign({}, save, { games: save.games + 1 }));
+  }
+  function announceUnlocks(fresh) {
+    if (!fresh.length) return;
+    setBanner(`${fresh.map((sk) => sk.name).join(' + ')} unlocked`, 'equip in the menu');
+    Sfx.unlock();
+  }
+
+  function die(hx, hy) {
+    G.state = 'dying';
+    G.dyingT = 0;
+    const [px, py] = polar(G.angle, playerRadius());
+    const sk = skinRgb(G.skin, G.realT);
+    burst(px, py, 70, sk, 0.9, 0.01, 1.0);
+    burst(px, py, 40, HAZARD_RGB, 0.7, 0.008, 0.8);
+    burst(hx, hy, 20, [255, 255, 255], 0.5, 0.005, 0.6);
+    ripple(px, py, PR, M * 0.35, HAZARD_RGB, 0.6, 4);
+    ripple(px, py, PR, M * 0.2, sk, 0.45, 2);
+    addTrauma(1);
+    flash(HAZARD_RGB, 0.55);
+    Sfx.death();
+    btnPause.hidden = true;
+
+    // Persist immediately so closing the tab during the death animation loses nothing.
+    const unlocked = endRun();
+    lastResult = { score: G.score, newBest: G.score > G.startBest, hadBest: G.startBest > 0, unlocked };
+  }
+
+  function showOver() {
+    G.state = 'over';
+    G.overAt = performance.now();
+    const r = lastResult;
+    $('oScore').textContent = r.score;
+    $('oBest').hidden = !r.newBest;
+    $('oBestVal').textContent = save.best;
+    $('oLap').textContent = G.lap;
+    $('oOrbs').textContent = G.orbs;
+    $('oCombo').textContent = G.bestCombo;
+    const ul = $('oUnlocks');
+    ul.textContent = '';
+    for (const sk of r.unlocked) {
+      const d = document.createElement('div');
+      d.className = 'unlock';
+      const sw = document.createElement('span');
+      sw.className = 'swatch';
+      sw.style.background = swatchCss(sk);
+      const tx = document.createElement('span');
+      tx.innerHTML = `<b>${sk.name}</b> core unlocked &middot; equip it in the menu`;
+      d.append(sw, tx);
+      ul.append(d);
+    }
+    // Next goal: the locked core you are closest to.
+    let goal = null, gp = -1;
+    for (const sk of SKINS) {
+      if (save.unlocked.includes(sk.id) || sk.stat === null) continue;
+      const p = save[sk.stat] / sk.target;
+      if (p > gp) { gp = p; goal = sk; }
+    }
+    const goalEl = $('oGoal');
+    if (goal) {
+      goalEl.hidden = false;
+      $('oGoalText').textContent = `Next core: ${goal.name} (${goal.label}) · ${STAT_NOUN[goal.stat]} ${save[goal.stat]}/${goal.target}`;
+      const fill = $('oGoalFill');
+      fill.style.width = '0%';
+      requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.width = `${Math.round(clamp(gp, 0, 1) * 100)}%`; }));
+    } else {
+      goalEl.hidden = true;
+    }
+    showOverlay('over');
+    if (r.newBest && r.hadBest) Sfx.best();
+    if (r.unlocked.length) Sfx.unlock();
+  }
+
+  function start() {
+    Audio.ensure();
+    const fresh = endRun(); // restarting mid-run keeps everything that run earned
+    resetRun();
+    G.runOpen = true;
+    G.state = 'play';
+    showOverlay(null);
+    btnPause.hidden = false;
+    blurActive();
+    Sfx.start();
+    const [x, y] = polar(G.angle, playerRadius());
+    ripple(x, y, PR, M * 0.12, skinRgb(G.skin, G.realT), 0.5, 3);
+    announceUnlocks(fresh);
+  }
+  function pauseGame() {
+    if (G.state !== 'play') return;
+    G.state = 'paused';
+    checkpoint();
+    btnPause.hidden = true;
+    showOverlay('pause');
+  }
+  function resumeGame() {
+    if (G.state !== 'paused') return;
+    G.state = 'play';
+    btnPause.hidden = false;
+    showOverlay(null);
+    blurActive();
+  }
+  function toMenu() {
+    if (endRun().length) Sfx.unlock(); // quitting mid-run keeps its progress; new cores show in the menu
+    resetRun();
+    G.state = 'menu';
+    btnPause.hidden = true;
+    renderMenu();
+    showOverlay('menu');
+  }
+  const canRetry = () => performance.now() - G.overAt > 350;
+
+  /* ------------------------------------------------------------------ *
+   * DOM UI
+   * ------------------------------------------------------------------ */
+  const $ = (id) => document.getElementById(id);
+  const btnPause = $('btnPause');
+  const overlays = { menu: $('menu'), over: $('over'), pause: $('pause') };
+  function showOverlay(name) {
+    for (const k in overlays) {
+      const on = k === name;
+      overlays[k].classList.toggle('show', on);
+      overlays[k].setAttribute('aria-hidden', on ? 'false' : 'true');
+    }
+    if (name === 'menu') $('btnPlay').focus({ preventScroll: true });
+    if (name === 'pause') $('btnResume').focus({ preventScroll: true });
+    if (name === 'over') $('btnRetry').focus({ preventScroll: true });
+  }
+  function blurActive() { if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); }
+  const swatchCss = (sk) => sk.rgb
+    ? `radial-gradient(circle at 35% 35%, #fff, ${rgba(sk.rgb, 1)} 55%)`
+    : 'conic-gradient(from 0deg, #ff6b6b, #ffd166, #6ff7a0, #6fd3ff, #b68cff, #ff6b6b)';
+
+  function renderMenu() {
+    $('mBest').textContent = save.best;
+    $('mLap').textContent = save.maxLap;
+    $('mOrbs').textContent = save.totalOrbs;
+    $('mGames').textContent = save.games;
+    $('mUnlocked').textContent = `· ${save.unlocked.length}/${SKINS.length}`;
+    const wrap = $('skins');
+    wrap.textContent = '';
+    for (const sk of SKINS) {
+      const unlocked = save.unlocked.includes(sk.id);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'skin';
+      b.disabled = !unlocked;
+      b.setAttribute('aria-pressed', String(save.skin === sk.id));
+      b.setAttribute('aria-label', unlocked ? `${sk.name} core${save.skin === sk.id ? ', equipped' : ''}` : `${sk.name} core, locked: ${sk.label}`);
+      const sw = document.createElement('span');
+      sw.className = 'swatch';
+      sw.style.background = swatchCss(sk);
+      if (!unlocked) sw.style.filter = 'grayscale(1) brightness(0.6)';
+      const nm = document.createElement('span'); nm.className = 'name'; nm.textContent = sk.name;
+      const rq = document.createElement('span'); rq.className = 'req';
+      rq.textContent = unlocked ? (save.skin === sk.id ? 'Equipped' : 'Tap to equip') : `${sk.label} · ${Math.min(save[sk.stat], sk.target)}/${sk.target}`;
+      b.append(sw, nm, rq);
+      if (!unlocked) {
+        b.insertAdjacentHTML('beforeend', '<svg class="lock" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V11a1 1 0 0 1 1-1h1zm2 0h6V7a3 3 0 0 0-6 0v3z"/></svg>');
+      }
+      b.addEventListener('click', () => {
+        if (!save.unlocked.includes(sk.id)) return;
+        Audio.ensure();
+        save.skin = sk.id;
+        G.skin = sk;
+        persist();
+        Sfx.ui();
+        renderMenu();
+        const [x, y] = polar(G.angle, playerRadius());
+        burst(x, y, 24, skinRgb(sk, G.realT), 0.4, 0.007, 0.6);
+        ripple(x, y, PR, M * 0.1, skinRgb(sk, G.realT), 0.45, 3);
+        const again = wrap.children[SKINS.indexOf(sk)];
+        if (again) again.focus({ preventScroll: true });
+      });
+      wrap.append(b);
+    }
+  }
+
+  function syncMuteUi() {
+    const b = $('btnMute');
+    b.setAttribute('aria-pressed', String(save.muted));
+    b.setAttribute('aria-label', save.muted ? 'Unmute sound' : 'Mute sound');
+    $('icoSound').style.display = save.muted ? 'none' : '';
+    $('icoMuted').style.display = save.muted ? '' : 'none';
+  }
+  function toggleMute() {
+    save.muted = !save.muted;
+    persist();
+    Audio.ensure();
+    Audio.setMuted(save.muted);
+    syncMuteUi();
+    if (!save.muted) Sfx.ui();
+  }
+
+  $('btnPlay').addEventListener('click', start);
+  $('btnRetry').addEventListener('click', () => { if (canRetry()) start(); });
+  $('btnMenu').addEventListener('click', () => { Sfx.ui(); toMenu(); });
+  $('btnResume').addEventListener('click', resumeGame);
+  $('btnRestart').addEventListener('click', start);
+  $('btnQuit').addEventListener('click', () => { Sfx.ui(); toMenu(); });
+  btnPause.addEventListener('click', () => { pauseGame(); });
+  $('btnMute').addEventListener('click', (e) => { toggleMute(); e.currentTarget.blur(); });
+  // Tap anywhere on the game-over card's backdrop (or card body) to retry instantly.
+  overlays.over.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button')) return;
+    if (G.state === 'over' && canRetry()) { e.preventDefault(); start(); }
+  });
+  overlays.pause.addEventListener('pointerdown', (e) => {
+    if (e.target === overlays.pause) resumeGame();
+  });
+
+  /* ------------------------------------------------------------------ *
+   * Input
+   * ------------------------------------------------------------------ */
+  cv.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    Audio.ensure();
+    if (G.state === 'play') hop();
+  });
+  cv.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  const ACTION_KEYS = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyS', 'KeyA', 'KeyD', 'Enter']);
+  window.addEventListener('keydown', (e) => {
+    const k = e.code;
+    const onButton = document.activeElement && document.activeElement.tagName === 'BUTTON';
+    if (ACTION_KEYS.has(k)) {
+      // Let a focused menu button handle Enter/Space natively (keyboard navigation).
+      if (G.state !== 'play' && onButton && (k === 'Space' || k === 'Enter')) return;
+      e.preventDefault();
+      if (e.repeat) return;
+      Audio.ensure();
+      if (G.state === 'play') hop();
+      else if (G.state === 'menu') start();
+      else if (G.state === 'over' && canRetry()) start();
+      else if (G.state === 'paused') resumeGame();
+    } else if (k === 'KeyR' && !e.repeat) {
+      if (G.state === 'play' || G.state === 'paused' || (G.state === 'over' && canRetry())) start();
+    } else if ((k === 'KeyP' || k === 'Escape') && !e.repeat) {
+      if (G.state === 'play') pauseGame();
+      else if (G.state === 'paused') resumeGame();
+    } else if (k === 'KeyM' && !e.repeat) {
+      toggleMute();
+    }
+  });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { pauseGame(); checkpoint(); } });
+  window.addEventListener('pagehide', () => { pauseGame(); checkpoint(); });
+  window.addEventListener('blur', () => pauseGame());
+
+  /* ------------------------------------------------------------------ *
+   * Background decoration (resize-independent: stored as fractions)
+   * ------------------------------------------------------------------ */
+  const stars = Array.from({ length: 90 }, () => ({ a: Math.random() * TAU, d: Math.sqrt(Math.random()) * 1.15, s: rand(0.5, 1.6), tw: Math.random() * TAU, sp: rand(0.01, 0.05) }));
+
+  /* ------------------------------------------------------------------ *
+   * Rendering
+   * ------------------------------------------------------------------ */
+  function draw() {
+    const acc = hslToRgb(G.hue, 0.85, 0.65);
+    const accSoft = hslToRgb(G.hue, 0.6, 0.8);
+    const now = G.realT;
+
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = '#07080d';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.save();
+    ctx.translate(FX.shakeX, FX.shakeY);
+
+    // Ambient glow
+    const R = Math.max(W, H) * 0.7;
+    const bg = ctx.createRadialGradient(CX, CY, 0, CX, CY, R);
+    bg.addColorStop(0, rgba(acc, 0.13));
+    bg.addColorStop(0.45, rgba(acc, 0.04));
+    bg.addColorStop(1, rgba(acc, 0));
+    ctx.fillStyle = bg;
+    ctx.fillRect(-50, -50, W + 100, H + 100);
+
+    // Stars
+    const half = Math.max(W, H) / 2;
+    for (const s of stars) {
+      const a = s.a + now * s.sp;
+      const x = CX + Math.cos(a) * s.d * half, y = CY + Math.sin(a) * s.d * half;
+      ctx.globalAlpha = 0.25 + 0.25 * Math.sin(now * 2 + s.tw);
+      ctx.fillStyle = '#cfd8ff';
+      ctx.fillRect(x, y, s.s, s.s);
+    }
+    ctx.globalAlpha = 1;
+
+    // Decorative tick ring
+    ctx.save();
+    ctx.translate(CX, CY);
+    ctx.rotate(now * 0.05);
+    ctx.strokeStyle = rgba(acc, 0.16);
+    ctx.lineWidth = 1;
+    const tr = ROUT + M * 0.075;
+    ctx.beginPath();
+    for (let i = 0; i < 96; i++) {
+      const a = (i / 96) * TAU, l = i % 8 === 0 ? M * 0.018 : M * 0.007;
+      ctx.moveTo(Math.cos(a) * tr, Math.sin(a) * tr);
+      ctx.lineTo(Math.cos(a) * (tr + l), Math.sin(a) * (tr + l));
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    // Orbits
+    const active = G.state === 'play' || G.state === 'paused' || G.state === 'dying';
+    for (const ringI of [0, 1]) {
+      const r = ringRadius(ringI);
+      const on = Math.round(G.rPos) === ringI;
+      ctx.beginPath();
+      ctx.arc(CX, CY, r, 0, TAU);
+      ctx.strokeStyle = rgba(acc, on ? 0.42 : 0.18);
+      ctx.lineWidth = on ? 2 : 1.25;
+      ctx.stroke();
+    }
+    // Lap progress arc
+    if (active) {
+      const prog = ((G.angle - START_ANGLE) % TAU + TAU) % TAU;
+      ctx.beginPath();
+      ctx.arc(CX, CY, ROUT + M * 0.035, START_ANGLE, START_ANGLE + prog);
+      ctx.strokeStyle = rgba(acc, 0.55);
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+    }
+
+    // Center HUD: lap label, score, combo
+    if (active) {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const pop = 1 + 0.22 * G.scorePop;
+      ctx.save();
+      ctx.translate(CX, CY);
+      ctx.scale(pop, pop);
+      ctx.font = `800 ${Math.round(M * 0.15)}px ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+      ctx.fillStyle = 'rgba(238,242,255,0.95)';
+      ctx.fillText(String(G.score), 0, M * 0.005);
+      ctx.restore();
+
+      if (G.banner) {
+        const b = G.banner, k = b.life / b.max;
+        const appear = easeOutBack(clamp((1 - k) * 5, 0, 1));
+        ctx.globalAlpha = clamp(k * 2.5, 0, 1);
+        ctx.font = `800 ${Math.round(M * 0.05 * appear)}px ui-sans-serif, system-ui, sans-serif`;
+        ctx.fillStyle = rgba(accSoft, 1);
+        ctx.fillText(b.text.toUpperCase(), CX, CY - M * 0.125);
+        ctx.font = `600 ${Math.round(M * 0.022)}px ui-sans-serif, system-ui, sans-serif`;
+        ctx.fillStyle = 'rgba(238,242,255,0.7)';
+        ctx.fillText(b.sub, CX, CY + M * 0.115);
+        ctx.globalAlpha = 1;
+      } else {
+        ctx.font = `600 ${Math.round(M * 0.02)}px ui-sans-serif, system-ui, sans-serif`;
+        ctx.fillStyle = 'rgba(160,168,190,0.85)';
+        ctx.fillText(`LAP ${G.lap}`, CX, CY - M * 0.11);
+        if (G.combo >= 2) {
+          ctx.font = `700 ${Math.round(M * 0.028)}px ui-sans-serif, system-ui, sans-serif`;
+          ctx.fillStyle = rgba(accSoft, 0.95);
+          ctx.fillText(`×${Math.min(G.combo, T.comboCap)} COMBO`, CX, CY + M * 0.11);
+        }
+      }
+    }
+
+    ctx.globalCompositeOperation = 'lighter';
+
+    // Orbs
+    for (const o of G.orbList) {
+      if (o.got) continue;
+      const [x, y] = polar(o.a, ringRadius(o.ring));
+      const age = clamp((G.t - o.born) / 0.4, 0, 1);
+      const fade = o.missed ? clamp(1 - (G.angle - o.a - T.orbMissAngle) / 0.3, 0, 1) : 1;
+      const s = easeOutBack(age) * fade;
+      if (s <= 0) continue;
+      const c = o.gold ? GOLD_RGB : accSoft;
+      const pulse = 1 + 0.15 * Math.sin(now * 8 + o.a * 3);
+      drawGlow(x, y, OR * 4.5 * pulse * s, c, o.missed ? 0.3 : 0.9);
+      ctx.fillStyle = o.missed ? 'rgba(150,150,170,0.6)' : rgba(c, 1);
+      ctx.beginPath();
+      ctx.arc(x, y, OR * s * (o.gold ? 1.1 : 0.9), 0, TAU);
+      ctx.fill();
+      if (o.gold && !o.missed) {
+        ctx.strokeStyle = rgba(GOLD_RGB, 0.8);
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(x, y, OR * 2 * s, now * 4, now * 4 + Math.PI * 1.2);
+        ctx.stroke();
+      }
+    }
+
+    // Hazards (shards)
+    for (const h of G.hazards) {
+      const [x, y] = polar(h.a, ringRadius(h.ring));
+      const age = clamp((G.t - h.born) / 0.35, 0, 1);
+      const behind = G.angle - h.a - T.passAngle;
+      const fade = behind > 0 ? clamp(1 - behind / (T.behind - T.passAngle), 0, 1) : 1;
+      const s = easeOutBack(age);
+      if (s <= 0 || fade <= 0) continue;
+      drawGlow(x, y, HR * 3.6 * s, HAZARD_RGB, 0.75 * fade);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(h.a + Math.sin(now * 3 + h.a) * 0.08);
+      ctx.scale(s, s);
+      ctx.globalAlpha = fade;
+      ctx.fillStyle = rgba(HAZARD_RGB, 1);
+      ctx.beginPath();
+      ctx.moveTo(HR * 1.3, 0);
+      ctx.lineTo(0, HR * 0.72);
+      ctx.lineTo(-HR * 1.3, 0);
+      ctx.lineTo(0, -HR * 0.72);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,220,230,0.9)';
+      ctx.beginPath();
+      ctx.moveTo(HR * 0.55, 0);
+      ctx.lineTo(0, HR * 0.28);
+      ctx.lineTo(-HR * 0.55, 0);
+      ctx.lineTo(0, -HR * 0.28);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Player trail + core
+    const showPlayer = G.state !== 'dying' && G.state !== 'over';
+    const sk = skinRgb(G.skin, now);
+    if (showPlayer) {
+      const tr2 = G.trail;
+      for (let i = 1; i < tr2.length; i++) {
+        const k = i / tr2.length;
+        const c = G.skin.rgb ? sk : skinRgb(G.skin, now - (tr2.length - i) * 0.03);
+        const [x0, y0] = polar(tr2[i - 1].a, lerp(RIN, ROUT, tr2[i - 1].r));
+        const [x1, y1] = polar(tr2[i].a, lerp(RIN, ROUT, tr2[i].r));
+        ctx.strokeStyle = rgba(c, 0.55 * k);
+        ctx.lineWidth = PR * 1.6 * k;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+        ctx.stroke();
+      }
+      ctx.lineCap = 'butt';
+      const [x, y] = polar(G.angle, playerRadius());
+      const squash = G.hopT < 1 ? 1 + 0.35 * Math.sin(G.hopT * Math.PI) : 1;
+      drawGlow(x, y, PR * 5, sk, 0.9);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(G.angle);
+      ctx.scale(1 / squash, squash);
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(0, 0, PR, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = rgba(sk, 1);
+      ctx.beginPath();
+      ctx.arc(0, 0, PR * 0.62, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Ripples
+    for (const r of ripples) {
+      const k = 1 - r.life / r.max;
+      ctx.strokeStyle = rgba(r.c, (1 - k) * 0.8);
+      ctx.lineWidth = r.w * (1 - k) + 0.5;
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, lerp(r.r0, r.r1, easeOutCubic(k)), 0, TAU);
+      ctx.stroke();
+    }
+
+    // Particles
+    for (const p of particles) {
+      const k = p.life / p.max;
+      ctx.fillStyle = rgba(p.c, k);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(0.5, p.size * (0.4 + 0.6 * k)), 0, TAU);
+      ctx.fill();
+    }
+
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Floating text
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (const t of texts) {
+      const k = t.life / t.max;
+      const sc = easeOutBack(clamp((1 - k) * 6, 0, 1));
+      ctx.globalAlpha = clamp(k * 2, 0, 1);
+      ctx.font = `800 ${Math.max(1, Math.round(t.size * M * sc))}px ui-sans-serif, system-ui, sans-serif`;
+      ctx.fillStyle = rgba(t.c, 1);
+      ctx.fillText(t.text, t.x, t.y);
+    }
+    ctx.globalAlpha = 1;
+
+    ctx.restore();
+
+    // Vignette + flash (screen space, unshaken)
+    const vg = ctx.createRadialGradient(CX, CY, M * 0.35, CX, CY, Math.max(W, H) * 0.75);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.55)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, W, H);
+    if (FX.flash > 0) {
+      ctx.fillStyle = rgba(FX.flashRgb, FX.flash * 0.5);
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Main loop
+   * ------------------------------------------------------------------ */
+  const SUBSTEP = 1 / 240;
+  function update(dt) {
+    G.realT += dt;
+    updateFx(dt);
+    // Ease the palette along the shortest arc of the colour wheel (never more than 180 degrees).
+    const dh = ((G.hueTarget - G.hue + 540) % 360) - 180;
+    G.hue = (G.hue + dh * (1 - Math.pow(0.02, dt)) + 360) % 360;
+    G.scorePop = Math.max(0, G.scorePop - dt * 4);
+    if (G.banner) { G.banner.life -= dt; if (G.banner.life <= 0) G.banner = null; }
+
+    if (G.state === 'play') {
+      G.timeScale = Math.min(1, G.timeScale + dt * 2.5);
+      const sdt = dt * G.timeScale;
+      const n = Math.max(1, Math.ceil(sdt / SUBSTEP));
+      for (let i = 0; i < n && G.state === 'play'; i++) step(sdt / n);
+    } else if (G.state === 'dying') {
+      G.dyingT += dt;
+      if (G.dyingT >= 0.75) showOver();
+    } else if (G.state === 'menu') {
+      // Attract mode: the core idles around the outer orbit.
+      G.angle += 0.9 * dt;
+      G.t += dt;
+    }
+
+    if (G.state === 'play' || G.state === 'menu') {
+      G.trail.push({ a: G.angle, r: G.rPos });
+      if (G.trail.length > 16) G.trail.shift();
+    }
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    let dt = (now - last) / 1000;
+    last = now;
+    if (!(dt > 0)) dt = 0;
+    if (dt > 0.1) dt = 0.1; // tab hitch guard: never simulate a huge jump
+    update(dt);
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  syncMuteUi();
+  renderMenu();
+  resetRun();
+  showOverlay('menu');
+  requestAnimationFrame(frame);
+
+  // Test hook (read-only snapshot; harmless in production).
+  window.__orbitShift = { G, save, T, start, hop, step };
+})();

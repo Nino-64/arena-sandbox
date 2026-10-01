@@ -1,0 +1,20 @@
+{
+  "match": "r1-m02",
+  "scores": {
+    "a004": {"correctness": 8, "completeness": 9, "specificity": 9, "robustness": 9, "clarity": 8, "fatal": false},
+    "a002": {"correctness": 7, "completeness": 9, "specificity": 9, "robustness": 9, "clarity": 8, "fatal": false}
+  },
+  "winner": "a004",
+  "reason": "Both fixed every attack, but a004 saves a run on every exit (death, restart, menu, pause, hidden tab, pagehide) and its fixes were tested in a browser; a002 still loses a paused run when the tab closes, even though it claims 'no way of leaving a run discards its progress', and its fixes were never re-run in a browser. a004's one flaw I found myself is smaller: on a landscape phone, scrolling the game-over card can trigger a pointerdown restart.",
+  "survived": [
+    "difficulty plateau with false 'faster' banner: fixed with heat ramp and honest banners",
+    "restart/menu discarding run progress: fixed via endRun/checkpoint",
+    "hue sweeping multiple colour wheels on restart: fixed with shortest-arc and reset",
+    "gold orb skip breaking combo: fixed",
+    "false lap-28 test claim: fixed and restated"
+  ],
+  "standing": {
+    "a004": [],
+    "a002": []
+  }
+}

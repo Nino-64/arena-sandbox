@@ -1,0 +1,11 @@
+{
+  "match": "r1-m01",
+  "scores": {
+    "a007": {"correctness": 8, "completeness": 10, "specificity": 9, "robustness": 9, "clarity": 9, "fatal": false},
+    "a001": {"correctness": 8, "completeness": 9, "specificity": 9, "robustness": 10, "clarity": 8, "fatal": false}
+  },
+  "winner": "a007",
+  "reason": "Both fixed every attack and are working single-file games, but a007 meets the progression/unlockables and juice requirements more fully (XP levels with shard payouts, skins, adaptive music sequencer, pause, live BEST) while a001's progression is skins-only and its R/restart-button mid-run restart silently discards a record score; a007's remaining flaw (Space toggles a mouse-focused mute button on menu/results screens) is minor.",
+  "survived": ["low-frame-rate spike tunnelling (fixed with sub-stepping)", "drifting spikes blocking both rings (fixed with drift reversal at hazardGap)", "~1.4 s forced restart wait (retry from 0.3 s during death)", "stale in-run BEST readout (live BEST with gold highlight)"],
+  "standing": {"a007": [], "a001": []}
+}
