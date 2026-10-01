@@ -263,7 +263,7 @@
     pickupPad: 0.012,             // extra orb pickup reach
     hopTime: 0.10,                // seconds to swap orbits
     omega0: 1.7, omegaStep: 0.16, omegaMax: 2.9, // angular speed (rad/s) per lap; capped from lap 9
-    heatLap: 9, heatLaps: 20,     // after the speed cap, the course gets denser from lap 9 to lap 29
+    heatLap: 9, heatLaps: 20,     // after the speed cap, forced swaps keep rising from lap 9 to lap 29
     ahead: 4.4,                   // spawn content this far ahead (rad)
     behind: 0.6,                  // discard content this far behind (rad)
     passAngle: 0.2,               // hazard counts as dodged this far behind (rad)
@@ -586,7 +586,7 @@
     // Say only what actually changed this lap.
     let what = '';
     if (omegaFor(G.lap) > omegaFor(G.lap - 1)) what = ' · faster';
-    else if (heatFor(G.lap) > heatFor(G.lap - 1)) what = heatFor(G.lap) >= 1 ? ' · max heat' : ' · denser';
+    else if (heatFor(G.lap) > heatFor(G.lap - 1)) what = heatFor(G.lap) >= 1 ? ' · max difficulty' : ' · more swaps';
     setBanner(`Lap ${G.lap}`, `+${bonus}${what}`);
     const acc = hslToRgb(G.hueTarget, 0.85, 0.65);
     for (const ringI of [0, 1]) ripple(CX, CY, ringRadius(ringI), ringRadius(ringI) + M * 0.08, acc, 0.7, 3);
