@@ -42,7 +42,6 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .hud-right{justify-self:end;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
 .icon-btn{pointer-events:auto;width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:rgba(255,255,255,.06);border:1px solid var(--line);transition:background .15s,transform .1s}
 .icon-btn:hover{background:rgba(255,255,255,.12)}
-.hud:not(.on) .icon-btn{pointer-events:none}
 .icon-btn:active{transform:scale(.94)}
 .best-mini{font-variant-numeric:tabular-nums}
 .powers{display:flex;gap:6px;min-height:22px}
@@ -52,7 +51,6 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .screen{position:fixed;inset:0;display:grid;place-items:center;padding:16px;overflow-y:auto;
   background:radial-gradient(ellipse at 50% 40%,rgba(5,6,15,.25),rgba(5,6,15,.82) 70%);
   opacity:0;visibility:hidden;transition:opacity .28s ease,visibility 0s linear .28s}
-.screen:not(.show){pointer-events:none}
 .screen.show{opacity:1;visibility:visible;transition:opacity .28s ease,visibility 0s}
 .screen.clear{background:radial-gradient(ellipse at 50% 50%,transparent 30%,rgba(5,6,15,.55) 80%)}
 .card{width:min(440px,100%);background:var(--glass);-webkit-backdrop-filter:blur(16px) saturate(140%);backdrop-filter:blur(16px) saturate(140%);
@@ -1459,8 +1457,7 @@ function startRun() {
   Sound.startMusic();
 }
 function retry() {
-  if (G.state !== 'over') return;          // stale clicks from a fading overlay do nothing
-  if (UI.overAge < 320) return;            // swallow the panic-tap that killed you
+  if (G.state === 'over' && UI.overAge < 320) return; // swallow the panic-tap that killed you
   startRun();
 }
 function pause() {
@@ -1540,16 +1537,16 @@ window.addEventListener('keydown', e => {
 });
 
 const click = (id, fn) => $(id).addEventListener('click', () => { Sound.unlock(); Sound.sfx.ui(); fn(); });
-click('btnPlay', () => { if (G.state === 'menu') startRun(); });
+click('btnPlay', startRun);
 click('btnHangar', () => { UI.buildHangar(); UI.show('hangar'); });
 click('btnSettings', () => { UI.syncSettings(); UI.show('settings'); });
 click('btnHangarBack', () => { UI.refreshTitle(); UI.show('title'); });
 click('btnSettingsBack', () => UI.show('title'));
 click('btnResume', resume);
-click('btnPauseRestart', () => { if (G.state === 'paused') startRun(); });
-click('btnPauseMenu', () => { if (G.state === 'paused') toMenu(); });
+click('btnPauseRestart', startRun);
+click('btnPauseMenu', toMenu);
 click('btnRetry', retry);
-click('btnOverMenu', () => { if (G.state === 'over') toMenu(); });
+click('btnOverMenu', toMenu);
 $('btnPause').addEventListener('click', () => { if (G.state === 'playing') pause(); });
 $('btnPause').addEventListener('pointerdown', e => e.stopPropagation());
 
@@ -1654,7 +1651,7 @@ else if (loadStatus === 'unavailable' || loadStatus === 'newer') toast(Store.rea
 requestAnimationFrame(t => { last = t; frame(t); });
 
 // Test hook (read-only snapshot) for automated checks; harmless in production.
-window.__orbital = { get state() { return G.state; }, get score() { return Math.floor(G.score); }, get save() { return JSON.parse(JSON.stringify(save())); } };
+window.__G = G; window.__spawnPulse = spawnPulse; window.__orbital = { get state() { return G.state; }, get score() { return Math.floor(G.score); }, get save() { return JSON.parse(JSON.stringify(save())); } };
 })();
 </script>
 </body>

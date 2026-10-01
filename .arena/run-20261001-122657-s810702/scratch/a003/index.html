@@ -283,11 +283,11 @@
 
   const SKINS = [
     { id: 'ion',   name: 'Ion',   hue: 188, req: 'Starter trail',          prog: () => 1 },
-    { id: 'ember', name: 'Ember', hue: 22,  req: 'Score 150 in one run',   prog: (s) => s.best / 150 },
+    { id: 'ember', name: 'Ember', hue: 22,  req: 'Score 250 in one run',   prog: (s) => s.best / 250 },
     { id: 'venom', name: 'Venom', hue: 105, req: 'Collect 200 orbs total', prog: (s) => s.orbs / 200 },
-    { id: 'nova',  name: 'Nova',  hue: 318, req: 'Chain 12 orbs',          prog: (s) => s.bestCombo / 12 },
+    { id: 'nova',  name: 'Nova',  hue: 318, req: 'Chain 16 orbs',          prog: (s) => s.bestCombo / 16 },
     { id: 'aurum', name: 'Aurum', hue: 46,  req: 'Finish 30 runs',         prog: (s) => s.games / 30 },
-    { id: 'prism', name: 'Prism', hue: -1,  req: 'Score 600 in one run',   prog: (s) => s.best / 600 },
+    { id: 'prism', name: 'Prism', hue: -1,  req: 'Score 1,500 in one run', prog: (s) => s.best / 1500 },
   ];
   const SKIN_IDS = new Set(SKINS.map((s) => s.id));
 
