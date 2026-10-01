@@ -430,7 +430,7 @@ function burst(x, y, n, col, spd = 260, size = 3, life = 0.7) {
     parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: l, max: l, size: size * U * (0.6 + Math.random() * 0.8), col });
   }
 }
-function popText(x, y, txt, col = '#fff', size = 18) { texts.push({ x, y, txt, col, size, life: 0.9, max: 0.9 }); }
+function popText(x, y, txt, col = '#fff', size = 18, life = 0.9) { texts.push({ x, y, txt, col, size, life, max: life }); }
 
 function startGame(carry) {
   A.init();
@@ -440,8 +440,8 @@ function startGame(carry) {
   parts.length = 0; texts.length = 0; trauma = 0; flash = 0;
   if (carry && carry.score !== undefined) { // instant retry skipped the results screen: say what was banked
     const y = CY - 70 * U;
-    if (carry.best) { popText(CX, y, 'NEW BEST · ' + carry.score, '#ffd166', 24); SFX.fanfare(); }
-    popText(CX, y + 30 * U, '+' + carry.earned + ' ◆ saved', '#ffd166', 15);
+    if (carry.best) { popText(CX, y, 'NEW BEST · ' + carry.score, '#ffd166', 24, 1.8); SFX.fanfare(); }
+    popText(CX, y + 30 * U, '+' + carry.earned + ' ◆ saved', '#ffd166', 15, 1.8);
   }
   state = 'play';
   showScreen(null);

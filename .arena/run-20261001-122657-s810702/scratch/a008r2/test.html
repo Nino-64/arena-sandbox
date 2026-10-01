@@ -564,13 +564,13 @@ function resize() {
   canvas.height = Math.round(view.h * view.dpr);
   view.cx = view.w / 2;
   // The play field sits below the HUD (score + combo line), measured from the DOM so it
-  // follows the CSS font sizes. The field needs 0.84 unit of height: two outer radii
-  // (0.74) plus room for hazard glow at the top and bottom of the outer orbit.
+  // follows the CSS font sizes. The field needs 0.88 unit of height: two outer radii
+  // (0.74) plus a hazard's full glow (0.07) above and below the outer orbit.
   const comboBottom = document.getElementById("combo").getBoundingClientRect().bottom;
   const top = (comboBottom > 0 ? comboBottom : 100) + 8;
   const bottom = 12;
   const avail = Math.max(120, view.h - top - bottom);
-  view.unit = Math.min(view.w, avail / 0.84, 760);
+  view.unit = Math.min(view.w, avail / 0.88, 760);
   view.cy = top + avail / 2;
   view.rIn = view.unit * 0.22;
   view.rOut = view.unit * 0.37;
