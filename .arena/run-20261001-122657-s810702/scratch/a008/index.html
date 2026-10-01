@@ -80,6 +80,8 @@
     transition: opacity .28s ease, visibility 0s linear .28s;
   }
   .screen.show { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity .28s ease, visibility 0s; }
+  #menu { background: radial-gradient(ellipse at center, rgba(7, 6, 13, .7), rgba(7, 6, 13, .45) 70%); }
+  #hangar { padding-top: max(76px, env(safe-area-inset-top)); }
   .screen.dim { background: radial-gradient(ellipse at center, rgba(7, 6, 13, .35), rgba(7, 6, 13, .82)); }
   .card {
     width: 100%; max-width: 420px; text-align: center;
@@ -136,7 +138,7 @@
   .hint { margin-top: 14px; font-size: 12px; color: var(--ink-faint); letter-spacing: .04em; }
 
   /* Hangar */
-  .hangar { max-width: 520px; text-align: left; padding: 22px; max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); overflow-y: auto; }
+  .hangar { max-width: 520px; text-align: left; padding: 22px; max-height: calc(100vh - 100px); max-height: calc(100dvh - 100px); overflow-y: auto; }
   .hangar-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; }
   .hangar h2 { margin: 0; font: 800 26px/1 var(--font); letter-spacing: -0.02em; }
   .bank { font: 700 15px/1 var(--mono); color: var(--gold); }
