@@ -1,0 +1,21 @@
+{
+  "match": "r2-m02",
+  "scores": {
+    "a004": {"correctness": 8, "completeness": 9, "specificity": 9, "robustness": 9, "clarity": 8, "fatal": false},
+    "a008": {"correctness": 9, "completeness": 10, "specificity": 9, "robustness": 9, "clarity": 8, "fatal": false}
+  },
+  "winner": "a008",
+  "reason": "Both fixed every attack they received, but a004 still has an unflagged risk-free close-call exploit: a double-hop chord sets lastHopFrom to a ring the core never reached. a008's code checks for exactly that case, and a008 also delivers the richer progression loop (shop, achievements, shield, music) with verified fixes.",
+  "survived": [
+    "close-call chord farming (fixed: needs the core to really leave the mine's orbit via the tweened radius)",
+    "global keydown hijacking focused Hangar/Menu buttons (fixed: onButton early return)",
+    "W/S case sensitivity (fixed: single-char keys lowercased)",
+    "R-spam farming Runs/Gravity Habit (fixed: abandoned runs count only after 5 s)",
+    "wrong reading-time claims (fixed in code: look-ahead max(2.4, 1.15 s x speed) capped at 4.3; table checks out)",
+    "HUD/banner overlapping the field or going off-screen (fixed: field laid out below the measured combo line, banner drawn inside the singularity)"
+  ],
+  "standing": {
+    "a004": [],
+    "a008": []
+  }
+}

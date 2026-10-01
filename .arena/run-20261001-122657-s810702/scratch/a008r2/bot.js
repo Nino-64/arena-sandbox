@@ -19,7 +19,7 @@ const [phase, secs] = [Number(process.argv[2]), Number(process.argv[3])];
       if (cur < 0.25 && oth > cur + 0.05) t.snapLane();
     }, 8);
   }, phase);
-  await p.waitForTimeout(secs * 1000);
+  await p.waitForTimeout(3000); await p.evaluate(() => { window.__minRead = 99; }); await p.waitForTimeout(secs * 1000 - 3000);
   console.log(JSON.stringify(await p.evaluate(() => ({ mode: window.__t.mode, phase: window.__t.G.phase, speed: +window.__t.G.speed.toFixed(2), t: +window.__t.G.runTime.toFixed(1), score: window.__t.G.score, cc: window.__t.G.closeCalls, minRead: +window.__minRead.toFixed(3) }))), errs);
   await b.close();
 })();
