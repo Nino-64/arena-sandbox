@@ -26,10 +26,10 @@
      "how": "Pick the least complicated answer that fully does the job. Every extra part has to justify itself."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r0/a001.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r1/r1-m01.a001.solution.md",
+   "alive": false,
+   "eliminated_in": 1,
+   "eliminated_by": "a007",
    "byes": 0
   },
   "a002": {
@@ -50,10 +50,10 @@
      "how": "Exact numbers, names, commands, file paths and steps. Zero generic advice."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r0/a002.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r1/r1-m02.a002.solution.md",
+   "alive": false,
+   "eliminated_in": 1,
+   "eliminated_by": "a004",
    "byes": 0
   },
   "a003": {
@@ -74,7 +74,7 @@
      "how": "Hunt the edge cases, failure modes and weird inputs first, and design the answer around surviving them."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r0/a003.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r1/r1-m03.a003.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -98,7 +98,7 @@
      "how": "Be exhaustive and exact. Check every step, verify every claim, and leave no hand-waving anywhere."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r0/a004.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r1/r1-m02.a004.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -122,10 +122,10 @@
      "how": "Assume the inputs are bad and the conditions are hostile. Make the answer fail safely and loudly rather than quietly."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r0/a005.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r1/r1-m04.a005.solution.md",
+   "alive": false,
+   "eliminated_in": 1,
+   "eliminated_by": "a008",
    "byes": 0
   },
   "a006": {
@@ -146,10 +146,10 @@
      "how": "Remove things until it breaks, then put the last one back. Fewer steps, fewer dependencies, fewer words."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r0/a006.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r1/r1-m03.a006.solution.md",
+   "alive": false,
+   "eliminated_in": 1,
+   "eliminated_by": "a003",
    "byes": 0
   },
   "a007": {
@@ -170,7 +170,7 @@
      "how": "Optimise for the fastest route to something usable today. Cut anything that does not move the result."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r0/a007.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r1/r1-m01.a007.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -194,7 +194,7 @@
      "how": "Name the real trade-offs, choose for the user's most likely constraints, and say plainly what that choice gives up."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r0/a008.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r1/r1-m04.a008.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -219,27 +219,95 @@
      "id": "r1-m01",
      "a": "a007",
      "b": "a001",
-     "winner": null,
-     "loser": null,
-     "reason": null,
-     "survived": [],
-     "scores": null,
-     "source": null
+     "winner": "a007",
+     "loser": "a001",
+     "reason": "Both fixed every attack and are working single-file games, but a007 meets the progression/unlockables and juice requirements more fully (XP levels with shard payouts, skins, adaptive music sequencer, pause, live BEST) while a001's progression is skins-only and its R/restart-button mid-run restart silently discards a record score; a007's remaining flaw (Space toggles a mouse-focused mute button on ",
+     "survived": [
+      "low-frame-rate spike tunnelling (fixed with sub-stepping)",
+      "drifting spikes blocking both rings (fixed with drift reversal at hazardGap)",
+      "~1.4 s forced restart wait (retry from 0.3 s during death)",
+      "stale in-run BEST readout (live BEST with gold highlight)"
+     ],
+     "scores": {
+      "a007": 89.5,
+      "a001": 88.0
+     },
+     "source": "judge"
     },
     {
      "id": "r1-m02",
      "a": "a004",
      "b": "a002",
-     "winner": null,
-     "loser": null,
-     "reason": null,
-     "survived": [],
-     "scores": null,
-     "source": null
+     "winner": "a004",
+     "loser": "a002",
+     "reason": "Both fixed every attack, but a004 saves a run on every exit (death, restart, menu, pause, hidden tab, pagehide) and its fixes were tested in a browser; a002 still loses a paused run when the tab closes, even though it claims 'no way of leaving a run discards its progress', and its fixes were never re-run in a browser. a004's one flaw I found myself is smaller: on a landscape phone, scrolling the g",
+     "survived": [
+      "difficulty plateau with false 'faster' banner: fixed with heat ramp and honest banners",
+      "restart/menu discarding run progress: fixed via endRun/checkpoint",
+      "hue sweeping multiple colour wheels on restart: fixed with shortest-arc and reset",
+      "gold orb skip breaking combo: fixed",
+      "false lap-28 test claim: fixed and restated"
+     ],
+     "scores": {
+      "a004": 86.0,
+      "a002": 83.0
+     },
+     "source": "judge"
     },
     {
      "id": "r1-m03",
      "a": "a006",
+     "b": "a003",
+     "winner": "a003",
+     "loser": "a006",
+     "reason": "Both games run without errors and fixed every attack (checked in headless Chromium), but a003 meets the 'highly polished' juice and progression requirements more fully: trauma shake with shockwaves, an adaptive layered beat, six varied unlock goals with progress bars, and hardened multi-tab/blocked-storage saves, against a006's thinner single-axis shard unlocks and simpler presentation.",
+     "survived": [
+      "slow touch restart: now about 0.65 s by taps alone (verified tap->results->play)",
+      "arrows/WASD not starting from menu: guard removed, ArrowUp now starts a run (verified)",
+      "shared voice cap starving music: split into separate 24 SFX / 16 music budgets"
+     ],
+     "scores": {
+      "a006": 87.5,
+      "a003": 89.0
+     },
+     "source": "judge"
+    },
+    {
+     "id": "r1-m04",
+     "a": "a005",
+     "b": "a008",
+     "winner": "a008",
+     "loser": "a005",
+     "reason": "Both games run error-free in headless Chromium and fully meet the four requirements, but a008 verifiably fixed all five attacks, while a005's fix for its MAJOR core-loop fairness attack (shockwave gap vs. meteors) admittedly leaves a residual case (a meteor between the player and a far gap), so a008 is slightly more robust.",
+     "survived": [
+      "silent save failure when storage is blocked: startup probe plus onFail red notice on the menu and result card",
+      "best and shards lost if the tab closes during the death animation: commitRun() now runs in die() and on pagehide",
+      "two tabs overwriting each other: Save.refresh() before every write plus a storage listener",
+      "AudioContext constructor throwing: graph built in try/catch, game runs silently",
+      "false claim that the game can never freeze: per-frame try/catch with recovery to the menu after 3 failed frames"
+     ],
+     "scores": {
+      "a005": 87.0,
+      "a008": 89.0
+     },
+     "source": "judge"
+    }
+   ],
+   "bye": null,
+   "closed": true
+  },
+  {
+   "n": 2,
+   "alive": [
+    "a003",
+    "a004",
+    "a007",
+    "a008"
+   ],
+   "matches": [
+    {
+     "id": "r2-m01",
+     "a": "a007",
      "b": "a003",
      "winner": null,
      "loser": null,
@@ -249,8 +317,8 @@
      "source": null
     },
     {
-     "id": "r1-m04",
-     "a": "a005",
+     "id": "r2-m02",
+     "a": "a004",
      "b": "a008",
      "winner": null,
      "loser": null,

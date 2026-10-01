@@ -1,0 +1,20 @@
+{
+  "match": "r1-m04",
+  "scores": {
+    "a005": {"correctness": 9, "completeness": 9, "specificity": 9, "robustness": 8, "clarity": 8, "fatal": false},
+    "a008": {"correctness": 9, "completeness": 9, "specificity": 9, "robustness": 9, "clarity": 8, "fatal": false}
+  },
+  "winner": "a008",
+  "reason": "Both games run error-free in headless Chromium and fully meet the four requirements, but a008 verifiably fixed all five attacks, while a005's fix for its MAJOR core-loop fairness attack (shockwave gap vs. meteors) admittedly leaves a residual case (a meteor between the player and a far gap), so a008 is slightly more robust.",
+  "survived": [
+    "silent save failure when storage is blocked: startup probe plus onFail red notice on the menu and result card",
+    "best and shards lost if the tab closes during the death animation: commitRun() now runs in die() and on pagehide",
+    "two tabs overwriting each other: Save.refresh() before every write plus a storage listener",
+    "AudioContext constructor throwing: graph built in try/catch, game runs silently",
+    "false claim that the game can never freeze: per-frame try/catch with recovery to the menu after 3 failed frames"
+  ],
+  "standing": {
+    "a005": ["unavoidable shockwave and meteor deaths: mostly fixed by cross-checking spawners, but the author concedes a residual case where a meteor sits between the player and a far gap"],
+    "a008": []
+  }
+}
