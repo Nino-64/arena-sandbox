@@ -54,6 +54,9 @@
   #combo .mult { display: inline-block; color: var(--gold); font-family: var(--mono); letter-spacing: 0; font-size: 15px; margin-left: 6px; }
   #combo .mult.pop { animation: pop .3s cubic-bezier(.2, 1.6, .4, 1); }
   @keyframes pop { 0% { transform: scale(1.8); } 100% { transform: scale(1); } }
+  #combo .hint-line { color: var(--ink); animation: hintPulse 1.4s ease-in-out infinite; }
+  @keyframes hintPulse { 50% { opacity: .55; } }
+  @media (max-height: 520px) { #score { font-size: 40px; } } /* landscape phones: give the play field the height */
   .hud-buttons { display: flex; gap: 8px; pointer-events: auto; }
 
   .icon-btn {
@@ -1048,15 +1051,21 @@ function render() {
   ctx.beginPath(); ctx.arc(cx, cy, view.rIn * (0.42 + beatPulse * 0.03), 0, TAU); ctx.stroke();
   ctx.globalAlpha = 1;
 
-  // phase number inside the core
+  // Phase number inside the core. On a phase change it doubles as the "speed up" banner:
+  // the label switches and the number pops. Nothing ever passes through the core, so the
+  // banner can't cover a hazard or fall off-screen at any viewport size.
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   if (mode === MODE.PLAY || mode === MODE.DYING || mode === MODE.PAUSE) {
-    ctx.fillStyle = hsl(hue, 40, 70); ctx.globalAlpha = 0.5;
-    ctx.font = `700 ${Math.round(view.unit * 0.026)}px ${FONT}`;
-    ctx.fillText("PHASE", cx, cy - view.unit * 0.03);
-    ctx.globalAlpha = 0.9; ctx.fillStyle = "#ffffff";
-    ctx.font = `800 ${Math.round(view.unit * 0.07)}px ${FONT}`;
-    ctx.fillText(G.phase, cx, cy + view.unit * 0.022);
+    const flashing = G.phaseFlash > 0 && mode === MODE.PLAY;
+    const k = flashing ? G.phaseFlash / 1.6 : 0;          // 1 -> 0 over the banner
+    const pop = flashing ? 1 + 0.55 * Math.pow(k, 2) : 1;
+    ctx.fillStyle = flashing ? hsl(hue, 90, 75) : hsl(hue, 40, 70);
+    ctx.globalAlpha = flashing ? 0.95 : 0.5;
+    ctx.font = `${flashing ? 800 : 700} ${Math.round(view.unit * 0.026)}px ${FONT}`;
+    ctx.fillText(flashing ? "SPEED UP" : "PHASE", cx, cy - view.unit * 0.03 * pop);
+    ctx.globalAlpha = 0.9; ctx.fillStyle = flashing ? hsl(hue, 100, 88) : "#ffffff";
+    ctx.font = `800 ${Math.round(view.unit * 0.07 * pop)}px ${FONT}`;
+    ctx.fillText(G.phase, cx, cy + view.unit * 0.022 * pop);
     ctx.globalAlpha = 1;
   }
 
@@ -1172,28 +1181,6 @@ function render() {
 
   FX.draw();
 
-  // phase banner
-  if (G.phaseFlash > 0 && mode === MODE.PLAY) {
-    const k = G.phaseFlash / 1.6, a = Math.min(1, k * 3) * Math.min(1, (1 - k) * 8);
-    ctx.globalAlpha = a;
-    ctx.fillStyle = hsl(hue, 90, 75);
-    ctx.font = `800 ${Math.round(view.unit * 0.06)}px ${FONT}`;
-    ctx.textAlign = "center";
-    ctx.fillText(`PHASE ${G.phase}`, cx, cy + view.rOut + view.unit * 0.12);
-    ctx.font = `600 ${Math.round(view.unit * 0.028)}px ${FONT}`;
-    ctx.fillStyle = "#ffffff"; ctx.globalAlpha = a * 0.7;
-    ctx.fillText("speed up", cx, cy + view.rOut + view.unit * 0.17);
-    ctx.globalAlpha = 1;
-  }
-
-  // first-run hint
-  if (mode === MODE.PLAY && G.runTime < 3 && Save.data.runs < 3) {
-    ctx.globalAlpha = clamp(3 - G.runTime, 0, 1) * 0.8;
-    ctx.fillStyle = "#ffffff"; ctx.textAlign = "center";
-    ctx.font = `600 ${Math.max(14, Math.round(view.unit * 0.032))}px ${FONT}`;
-    ctx.fillText("Tap / Space to switch orbit", cx, Math.min(h - 40, cy + view.rOut + view.unit * 0.12));
-    ctx.globalAlpha = 1;
-  }
   ctx.restore();
 
   // full-screen flash + vignette (not shaken)
@@ -1211,7 +1198,7 @@ function render() {
 const $ = id => document.getElementById(id);
 const ui = {
   score: { el: $("score"), dirty: true },
-  combo: { el: $("combo"), dirty: true, pop: false },
+  combo: { el: $("combo"), dirty: true, pop: false, hint: false },
   screens: { menu: $("menu"), over: $("over"), pause: $("pause"), hangar: $("hangar") },
   hangarReturn: "menu"
 };
@@ -1240,6 +1227,9 @@ function updateMuteIcon() {
   b.setAttribute("aria-label", Save.data.muted ? "Unmute sound" : "Mute sound");
 }
 function syncHud() {
+  // first-run hint lives in the combo line, which the layout already keeps clear of the field
+  const hint = mode === MODE.PLAY && G.runTime < 3 && G.combo < 2 && Save.data.runs < 3;
+  if (hint !== ui.combo.hint) { ui.combo.hint = hint; ui.combo.dirty = true; }
   if (ui.score.dirty) {
     ui.score.el.textContent = fmt(G.shown);
     ui.score.dirty = false;
@@ -1249,7 +1239,7 @@ function syncHud() {
     if (G.combo >= 2) {
       c.innerHTML = `Combo ${G.combo}<span class="mult">x${G.mult}</span>`;
       if (ui.combo.pop) { const m = c.querySelector(".mult"); m.classList.add("pop"); }
-    } else c.textContent = "";
+    } else c.innerHTML = ui.combo.hint ? '<span class="hint-line">Tap or Space to switch orbit</span>' : "";
     ui.combo.dirty = false; ui.combo.pop = false;
   }
 }
@@ -1404,27 +1394,29 @@ canvas.addEventListener("pointerdown", e => {
 window.addEventListener("keyup", e => { if (e.key === " " && mode === MODE.PLAY) e.preventDefault(); });
 window.addEventListener("keydown", e => {
   if (e.repeat) return;
-  const k = e.key;
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key; // W/S/R/P/M work with Caps Lock or Shift
+  // Space/Enter on a focused button belong to that button (Hangar, Menu, Resume...), not the game.
+  const onButton = document.activeElement && document.activeElement.tagName === "BUTTON";
   const inHangar = ui.screens.hangar.classList.contains("show");
-  if (k === "m" || k === "M") { Sound.unlock(); Sound.setMuted(!Save.data.muted); updateMuteIcon(); return; }
+  if (k === "m") { Sound.unlock(); Sound.setMuted(!Save.data.muted); updateMuteIcon(); return; }
   if (mode === MODE.PLAY) {
     if (k === " " || k === "ArrowUp" || k === "ArrowDown" || k === "w" || k === "s" || k === "Enter") { e.preventDefault(); snapLane(); }
-    else if (k === "Escape" || k === "p" || k === "P") pause();
-    else if (k === "r" || k === "R") startRun();
+    else if (k === "Escape" || k === "p") pause();
+    else if (k === "r") startRun();
     return;
   }
   if (mode === MODE.PAUSE) {
-    if (k === "Escape" || k === "p" || k === "P") resume();
-    else if (k === "r" || k === "R") startRun();
+    if (k === "Escape" || k === "p") resume();
+    else if (k === "r") startRun();
     return;
   }
   if (inHangar) { if (k === "Escape") $("hangarBack").click(); return; }
-  if (mode === MODE.OVER && (k === " " || k === "Enter" || k === "r" || k === "R")) {
+  if (onButton && (k === " " || k === "Enter")) return; // the button's own click handler runs
+  if (mode === MODE.OVER && (k === " " || k === "Enter" || k === "r")) {
     e.preventDefault();
     retry();
     return;
   }
-  if (mode === MODE.MENU && (k === " " || k === "Enter") && document.activeElement === $("playBtn")) return; // button handles it
   if (mode === MODE.MENU && k === " ") { e.preventDefault(); startRun(); }
 });
 
