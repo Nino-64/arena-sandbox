@@ -74,10 +74,10 @@
      "how": "Hunt the edge cases, failure modes and weird inputs first, and design the answer around surviving them."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r1/r1-m03.a003.solution.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r2/r2-m01.a003.solution.md",
+   "alive": false,
+   "eliminated_in": 2,
+   "eliminated_by": "a007",
    "byes": 0
   },
   "a004": {
@@ -98,10 +98,10 @@
      "how": "Be exhaustive and exact. Check every step, verify every claim, and leave no hand-waving anywhere."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r1/r1-m02.a004.solution.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r2/r2-m02.a004.solution.md",
+   "alive": false,
+   "eliminated_in": 2,
+   "eliminated_by": "a008",
    "byes": 0
   },
   "a005": {
@@ -170,7 +170,7 @@
      "how": "Optimise for the fastest route to something usable today. Cut anything that does not move the result."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r1/r1-m01.a007.solution.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r2/r2-m01.a007.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -194,7 +194,7 @@
      "how": "Name the real trade-offs, choose for the user's most likely constraints, and say plainly what that choice gives up."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r1/r1-m04.a008.solution.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20261001-122657-s810702/r2/r2-m02.a008.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -309,16 +309,57 @@
      "id": "r2-m01",
      "a": "a007",
      "b": "a003",
-     "winner": null,
-     "loser": null,
-     "reason": null,
-     "survived": [],
-     "scores": null,
-     "source": null
+     "winner": "a007",
+     "loser": "a003",
+     "reason": "Both fixed every attack, but a007 has the richer progression loop (XP levels, shard economy, Pulse mechanic) and keeps every button on screen at 568x320 in headless Chromium. a003's results buttons sit about 16px below the fold at that size (it still scrolls), and it ships a leftover window.__orbita test hook.",
+     "survived": [
+      "landscape panels unreachable: verified shopBack/Retry/Skins/Menu on-screen at 667x375 and 568x320",
+      "CLUTCH double-tap farming: now requires real occupancy of spike's orbit via P.onT",
+      "NEW BEST lost on R/pause-restart/menu/tab-close: idempotent bank() on every exit path",
+      "contradictory testing claims: reconciled",
+      "instant retry swallowing NEW BEST and stray fanfare: silent bank plus in-run banner"
+     ],
+     "scores": {
+      "a007": 93.5,
+      "a003": 88.0
+     },
+     "source": "judge"
     },
     {
      "id": "r2-m02",
      "a": "a004",
+     "b": "a008",
+     "winner": "a008",
+     "loser": "a004",
+     "reason": "Both fixed every attack they received, but a004 still has an unflagged risk-free close-call exploit: a double-hop chord sets lastHopFrom to a ring the core never reached. a008's code checks for exactly that case, and a008 also delivers the richer progression loop (shop, achievements, shield, music) with verified fixes.",
+     "survived": [
+      "close-call chord farming (fixed: needs the core to really leave the mine's orbit via the tweened radius)",
+      "global keydown hijacking focused Hangar/Menu buttons (fixed: onButton early return)",
+      "W/S case sensitivity (fixed: single-char keys lowercased)",
+      "R-spam farming Runs/Gravity Habit (fixed: abandoned runs count only after 5 s)",
+      "wrong reading-time claims (fixed in code: look-ahead max(2.4, 1.15 s x speed) capped at 4.3; table checks out)",
+      "HUD/banner overlapping the field or going off-screen (fixed: field laid out below the measured combo line, banner drawn inside the singularity)"
+     ],
+     "scores": {
+      "a004": 86.0,
+      "a008": 91.5
+     },
+     "source": "judge"
+    }
+   ],
+   "bye": null,
+   "closed": true
+  },
+  {
+   "n": 3,
+   "alive": [
+    "a007",
+    "a008"
+   ],
+   "matches": [
+    {
+     "id": "r3-m01",
+     "a": "a007",
      "b": "a008",
      "winner": null,
      "loser": null,

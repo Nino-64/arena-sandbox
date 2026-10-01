@@ -1,0 +1,17 @@
+{
+  "match": "r2-m01",
+  "scores": {
+    "a007": {"correctness": 9, "completeness": 10, "specificity": 9, "robustness": 10, "clarity": 8, "fatal": false},
+    "a003": {"correctness": 8, "completeness": 9, "specificity": 9, "robustness": 10, "clarity": 8, "fatal": false}
+  },
+  "winner": "a007",
+  "reason": "Both fixed every attack, but a007 has the richer progression loop (XP levels, shard economy, Pulse mechanic) and keeps every button on screen at 568x320 in headless Chromium. a003's results buttons sit about 16px below the fold at that size (it still scrolls), and it ships a leftover window.__orbita test hook.",
+  "survived": [
+    "landscape panels unreachable: verified shopBack/Retry/Skins/Menu on-screen at 667x375 and 568x320",
+    "CLUTCH double-tap farming: now requires real occupancy of spike's orbit via P.onT",
+    "NEW BEST lost on R/pause-restart/menu/tab-close: idempotent bank() on every exit path",
+    "contradictory testing claims: reconciled",
+    "instant retry swallowing NEW BEST and stray fanfare: silent bank plus in-run banner"
+  ],
+  "standing": {"a007": [], "a003": []}
+}
