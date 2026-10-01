@@ -312,8 +312,8 @@
     return s;
   }
   const save = loadSave();
-  function persist() {
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* storage full or blocked: play on without saving */ }
+  function persist(data = save) {
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { /* storage full or blocked: play on without saving */ }
   }
   const skinUnlockedByStats = (sk) => sk.stat === null || save[sk.stat] >= sk.target;
   function collectUnlocks() {
@@ -510,13 +510,15 @@
     score: 0, orbs: 0, combo: 0, bestCombo: 0, closes: 0, lap: 1,
     hazards: [], orbList: [], nextA: 0, nextRing: 0,
     timeScale: 1, dyingT: 0, overAt: 0, scorePop: 0, banner: null,
-    hue: 205, hueTarget: 205, trail: [], skin: skinById(save.skin), realT: 0
+    hue: 205, hueTarget: 205, trail: [], skin: skinById(save.skin), realT: 0,
+    runOpen: false, bankedOrbs: 0, startBest: 0   // save bookkeeping for the current run
   };
 
   function resetRun() {
     G.t = 0; G.angle = START_ANGLE; G.ring = 1; G.rPos = 1; G.hop0 = 1; G.hopT = 1;
     G.lastHopAngle = -1e9; G.lastHopFrom = -1;
     G.score = 0; G.orbs = 0; G.combo = 0; G.bestCombo = 0; G.closes = 0; G.lap = 1;
+    G.runOpen = false; G.bankedOrbs = 0; G.startBest = save.best;
     G.hazards.length = 0; G.orbList.length = 0;
     G.nextA = START_ANGLE + T.startGap; G.nextRing = Math.random() < 0.5 ? 0 : 1;
     G.timeScale = 1; G.dyingT = 0; G.scorePop = 0; G.banner = null;
@@ -666,6 +668,41 @@
    * ------------------------------------------------------------------ */
   let lastResult = null;
 
+  /* Save bookkeeping. A run is "open" from start() until it ends by death, restart,
+   * quitting to the menu, or the page closing. Whatever way it ends, its progress is
+   * kept, and it counts as exactly one run played. */
+  function bankRun() {
+    // Fold the run's progress into the save. Safe to call any number of times.
+    save.totalOrbs += G.orbs - G.bankedOrbs;
+    G.bankedOrbs = G.orbs;
+    save.maxLap = Math.max(save.maxLap, G.lap);
+    save.bestCombo = Math.max(save.bestCombo, G.bestCombo);
+    save.best = Math.max(save.best, G.score);
+  }
+  function endRun() {
+    if (!G.runOpen) return [];
+    G.runOpen = false;
+    bankRun();
+    save.games += 1;
+    const fresh = collectUnlocks();
+    persist();
+    return fresh;
+  }
+  function checkpoint() {
+    // Pause, hidden tab or page close: store the run as if it ended now, without ending it.
+    // The stored copy counts the open run as played; the in-memory count is untouched, so
+    // ending the run later writes the same total (no double count). Unlocks earned by the
+    // stored stats are granted by loadSave() on the next visit.
+    if (!G.runOpen) return;
+    bankRun();
+    persist(Object.assign({}, save, { games: save.games + 1 }));
+  }
+  function announceUnlocks(fresh) {
+    if (!fresh.length) return;
+    setBanner(`${fresh.map((sk) => sk.name).join(' + ')} unlocked`, 'equip in the menu');
+    Sfx.unlock();
+  }
+
   function die(hx, hy) {
     G.state = 'dying';
     G.dyingT = 0;
@@ -682,16 +719,8 @@
     btnPause.hidden = true;
 
     // Persist immediately so closing the tab during the death animation loses nothing.
-    const prevBest = save.best;
-    save.games += 1;
-    save.totalOrbs += G.orbs;
-    save.maxLap = Math.max(save.maxLap, G.lap);
-    save.bestCombo = Math.max(save.bestCombo, G.bestCombo);
-    const newBest = G.score > prevBest;
-    if (newBest) save.best = G.score;
-    const unlocked = collectUnlocks();
-    persist();
-    lastResult = { score: G.score, newBest, hadBest: prevBest > 0, unlocked };
+    const unlocked = endRun();
+    lastResult = { score: G.score, newBest: G.score > G.startBest, hadBest: G.startBest > 0, unlocked };
   }
 
   function showOver() {
@@ -741,7 +770,9 @@
 
   function start() {
     Audio.ensure();
+    const fresh = endRun(); // restarting mid-run keeps everything that run earned
     resetRun();
+    G.runOpen = true;
     G.state = 'play';
     showOverlay(null);
     btnPause.hidden = false;
@@ -749,10 +780,12 @@
     Sfx.start();
     const [x, y] = polar(G.angle, playerRadius());
     ripple(x, y, PR, M * 0.12, skinRgb(G.skin, G.realT), 0.5, 3);
+    announceUnlocks(fresh);
   }
   function pauseGame() {
     if (G.state !== 'play') return;
     G.state = 'paused';
+    checkpoint();
     btnPause.hidden = true;
     showOverlay('pause');
   }
@@ -764,6 +797,7 @@
     blurActive();
   }
   function toMenu() {
+    if (endRun().length) Sfx.unlock(); // quitting mid-run keeps its progress; new cores show in the menu
     resetRun();
     G.state = 'menu';
     btnPause.hidden = true;
@@ -904,7 +938,8 @@
       toggleMute();
     }
   });
-  document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { pauseGame(); checkpoint(); } });
+  window.addEventListener('pagehide', () => { pauseGame(); checkpoint(); });
   window.addEventListener('blur', () => pauseGame());
 
   /* ------------------------------------------------------------------ *
