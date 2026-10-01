@@ -254,7 +254,7 @@
   const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 
   /* ------------------------------------------------------------------ *
-   * Tuning (all distances are fractions of M = min(1.12 * width, height, 1000 px))
+   * Tuning (all distances are fractions of M = min(viewport w, h))
    * ------------------------------------------------------------------ */
   const T = {
     rIn: 0.23, rOut: 0.34,        // orbit radii
@@ -262,8 +262,7 @@
     hitScale: 0.8,                // hazard hitbox = 80% of drawn size (forgiving)
     pickupPad: 0.012,             // extra orb pickup reach
     hopTime: 0.10,                // seconds to swap orbits
-    omega0: 1.7, omegaStep: 0.16, omegaMax: 2.9, // angular speed (rad/s) per lap; capped from lap 9
-    heatLap: 9, heatLaps: 20,     // after the speed cap, the course gets denser from lap 9 to lap 29
+    omega0: 1.7, omegaStep: 0.16, omegaMax: 2.9, // angular speed (rad/s) per lap
     ahead: 4.4,                   // spawn content this far ahead (rad)
     behind: 0.6,                  // discard content this far behind (rad)
     passAngle: 0.2,               // hazard counts as dodged this far behind (rad)
@@ -520,7 +519,7 @@
     G.hazards.length = 0; G.orbList.length = 0;
     G.nextA = START_ANGLE + T.startGap; G.nextRing = Math.random() < 0.5 ? 0 : 1;
     G.timeScale = 1; G.dyingT = 0; G.scorePop = 0; G.banner = null;
-    G.hue = 205; G.hueTarget = 205; G.trail.length = 0;
+    G.hueTarget = 205; G.trail.length = 0;
     G.skin = skinById(save.skin);
     particles.length = 0; ripples.length = 0; texts.length = 0;
   }
@@ -528,11 +527,6 @@
   const ringRadius = (ringIndex) => lerp(RIN, ROUT, ringIndex);
   const playerRadius = () => lerp(RIN, ROUT, G.rPos);
   const omegaFor = (lap) => Math.min(T.omegaMax, T.omega0 + T.omegaStep * (lap - 1));
-  // "Heat" (0..1) keeps the run escalating once speed is capped. It never lowers the
-  // minimum gaps (the fairness floor); it only raises the share of forced swaps and
-  // pulls the longer, easier gaps down toward that floor.
-  const heatFor = (lap) => clamp((lap - T.heatLap) / T.heatLaps, 0, 1);
-  const lapBonus = (lap) => Math.min(25, 5 + 2 * (lap - 2)); // lap 2: +5, lap 3: +7 ... lap 12 on: +25
   const polar = (a, r) => [CX + Math.cos(a) * r, CY + Math.sin(a) * r];
 
   /* Content generator. Each "beat" puts one shard on one orbit. The gap to the
@@ -543,10 +537,9 @@
     while (G.nextA < limit) {
       const ring = G.nextRing;
       const lapK = Math.max(0.85, 1 - 0.03 * (G.lap - 1));
-      const heat = heatFor(G.lap);
-      const swap = Math.random() < 0.55 + 0.25 * heat;
+      const swap = Math.random() < 0.55;
       const nxt = swap ? 1 - ring : ring;
-      const gap = (swap ? rand(0.85, 1.15 - 0.15 * heat) : rand(0.62, 0.9 - 0.15 * heat)) * lapK;
+      const gap = (swap ? rand(0.85, 1.15) : rand(0.62, 0.9)) * lapK;
       G.hazards.push({ a: G.nextA, ring, born: G.t, passed: false });
       const r = Math.random();
       if (gap >= 0.8 && r < 0.2) {
@@ -577,15 +570,10 @@
   function setBanner(text, sub) { G.banner = { text, sub, life: 1.6, max: 1.6 }; }
 
   function onLap() {
-    G.hueTarget = (205 + (G.lap - 1) * 47) % 360;
-    const bonus = lapBonus(G.lap);
-    G.score += bonus;
+    G.hueTarget = 205 + (G.lap - 1) * 47;
+    G.score += 5;
     G.scorePop = 1;
-    // Say only what actually changed this lap.
-    let what = '';
-    if (omegaFor(G.lap) > omegaFor(G.lap - 1)) what = ' · faster';
-    else if (heatFor(G.lap) > heatFor(G.lap - 1)) what = heatFor(G.lap) >= 1 ? ' · max heat' : ' · denser';
-    setBanner(`Lap ${G.lap}`, `+${bonus}${what}`);
+    setBanner(`Lap ${G.lap}`, '+5 · faster');
     const acc = hslToRgb(G.hueTarget, 0.85, 0.65);
     for (const ringI of [0, 1]) ripple(CX, CY, ringRadius(ringI), ringRadius(ringI) + M * 0.08, acc, 0.7, 3);
     addTrauma(0.25);
@@ -650,7 +638,6 @@
         Sfx.orb(G.combo, o.gold);
       } else if (G.angle - o.a > T.orbMissAngle) {
         o.missed = true;
-        if (o.gold) continue; // gold is an optional risk: skipping it never costs the combo
         if (G.combo >= 2) {
           floatText('combo lost', px, py - M * 0.03, [160, 168, 190], 0.022, 0.7);
           Sfx.comboBreak();
@@ -1173,9 +1160,7 @@
   function update(dt) {
     G.realT += dt;
     updateFx(dt);
-    // Ease the palette along the shortest arc of the colour wheel (never more than 180 degrees).
-    const dh = ((G.hueTarget - G.hue + 540) % 360) - 180;
-    G.hue = (G.hue + dh * (1 - Math.pow(0.02, dt)) + 360) % 360;
+    G.hue = lerp(G.hue, G.hueTarget, 1 - Math.pow(0.02, dt));
     G.scorePop = Math.max(0, G.scorePop - dt * 4);
     if (G.banner) { G.banner.life -= dt; if (G.banner.life <= 0) G.banner = null; }
 

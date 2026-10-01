@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#07070d">
+<title>Orbit</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #07070d; }
+  body { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+  canvas { display: block; width: 100vw; height: 100vh; height: 100dvh; cursor: pointer; outline: none; }
+</style>
+</head>
+<body>
+<canvas id="c" tabindex="0" aria-label="Orbit. Tap, click or press Space to flip between the inner and outer ring. Dodge the red arcs, collect gold shards."></canvas>
+<script>
+'use strict';
+// ---------- setup ----------
+const cv = document.getElementById('c'), cx = cv.getContext('2d');
+const KEY = 'orbit.save.v1';
+const FONT = 'ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+const MQ = matchMedia('(prefers-reduced-motion: reduce)'); // read live, so an OS change applies mid-session
+const TAU = Math.PI * 2, RED = '#ff4d6d', GOLD = '#ffd166';
+const SKINS = [
+  { name: 'Ion', c: '#7cf7ff', cost: 0 },
+  { name: 'Ember', c: '#ff9f5a', cost: 30 },
+  { name: 'Venom', c: '#a6ff6b', cost: 100 },
+  { name: 'Orchid', c: '#d58bff', cost: 250 },
+  { name: 'Solar', c: '#fff27a', cost: 500 },
+  { name: 'Prism', c: null, cost: 1000 }
+];
+
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if (s && typeof s === 'object') return { best: +s.best || 0, shards: +s.shards || 0, plays: +s.plays || 0, skin: +s.skin || 0, muted: !!s.muted };
+  } catch (e) {}
+  return { best: 0, shards: 0, plays: 0, skin: 0, muted: false };
+}
+function store() { try { localStorage.setItem(KEY, JSON.stringify(G.save)); } catch (e) {} }
+function unlocked(i) { return i >= 0 && i < SKINS.length && G.save.shards >= SKINS[i].cost; }
+function skinColor(i = G.save.skin) { return SKINS[i].c || 'hsl(' + ((G.t * 140) % 360) + ',100%,70%)'; }
+
+const G = {
+  state: 'menu', save: load(), t: 0, rt: 0, a: -Math.PI / 2, lane: 0, from: 0, r: 0, w: 0,
+  score: 0, mult: 1, obs: [], gems: [], parts: [], texts: [], trail: [],
+  shake: 0, flash: 0, hit: 0, slow: 1, pop: 0, beat: 0, beatT: 0, beatN: 0, squash: 0,
+  next: 0, runShards: 0, lastFlip: -9, newBest: false, deadT: 0, unlockedNow: []
+};
+if (!unlocked(G.save.skin)) G.save.skin = 0;
+
+let W, H, U, CX, CY, DPR;
+function resize() {
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight; U = Math.min(W * 1.25, H * 0.92);
+  CX = W / 2; CY = H / 2;
+  cv.width = W * DPR | 0; cv.height = H * DPR | 0;
+  G.r = laneR(G.lane);
+}
+const laneR = l => U * (l ? 0.34 : 0.22);
+const PR = () => U * 0.022;
+addEventListener('resize', resize);
+
+const STARS = Array.from({ length: 160 }, () => ({ a: Math.random() * TAU, d: Math.sqrt(Math.random()), s: Math.random() * 1.4 + 0.3, p: Math.random() * TAU }));
+
+// ---------- audio (procedural) ----------
+var AC = null;
+let master = null, noiseBuf = null;
+function audio() {
+  if (!AC) {
+    const C = window.AudioContext || window.webkitAudioContext;
+    if (!C) return;
+    AC = new C();
+    const comp = AC.createDynamicsCompressor();
+    master = AC.createGain();
+    master.gain.value = G.save.muted ? 0 : 0.5;
+    master.connect(comp); comp.connect(AC.destination);
+    noiseBuf = AC.createBuffer(1, AC.sampleRate, AC.sampleRate);
+    const ch = noiseBuf.getChannelData(0);
+    for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+  }
+  if (AC.state === 'suspended') AC.resume();
+}
+function tone(f, d, type, v, f2, delay) {
+  if (!AC || G.save.muted) return;
+  const t = AC.currentTime + (delay || 0), o = AC.createOscillator(), g = AC.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(f, t);
+  if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(v, t + 0.006);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t + d + 0.05);
+}
+function noise(d, v, fc, hp) {
+  if (!AC || G.save.muted) return;
+  const t = AC.currentTime, s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
+  s.buffer = noiseBuf; f.type = hp ? 'highpass' : 'lowpass';
+  f.frequency.setValueAtTime(fc, t);
+  if (!hp) f.frequency.exponentialRampToValueAtTime(80, t + d);
+  g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t + d + 0.05);
+}
+const note = n => 220 * Math.pow(2, n / 12);
+const SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
+const BASS = [0, 0, 7, 5, 3, 3, 10, 7];
+const SFX = {
+  flip() { tone(G.lane ? 520 : 390, 0.08, 'triangle', 0.16, G.lane ? 780 : 260); },
+  gem() { const n = SCALE[Math.min(G.mult - 1, SCALE.length - 1)]; tone(note(n + 12), 0.28, 'sine', 0.24); tone(note(n + 24), 0.18, 'triangle', 0.06, 0, 0.03); },
+  dodge() { tone(1800, 0.03, 'square', 0.025); },
+  close() { tone(note(24), 0.14, 'sawtooth', 0.07, note(31)); },
+  lose() { tone(note(7), 0.25, 'triangle', 0.14, note(-5)); },
+  die() { noise(0.9, 0.7, 2600); tone(150, 0.8, 'sawtooth', 0.25, 28); },
+  start() { [0, 4, 7, 12].forEach((n, i) => tone(note(n + 12), 0.16, 'triangle', 0.13, 0, i * 0.045)); },
+  best() { [0, 4, 7, 12, 16, 19].forEach((n, i) => tone(note(n + 12), 0.35, 'sine', 0.16, 0, 0.3 + i * 0.07)); },
+  click() { tone(1100, 0.04, 'square', 0.05); },
+  deny() { tone(160, 0.12, 'square', 0.08, 120); },
+  beat(n) {
+    tone(110, 0.16, 'sine', 0.45, 38);
+    if (n % 2) noise(0.05, 0.08, 7000, true);
+    tone(note(BASS[(n >> 1) % 8] - 24), 0.22, 'triangle', 0.12);
+  }
+};
+function setMuted(m) {
+  G.save.muted = m; store();
+  if (master) master.gain.value = m ? 0 : 0.5;
+}
+
+// ---------- juice helpers ----------
+function burst(x, y, n, c, sp, sz) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * TAU, v = sp * (0.3 + Math.random());
+    G.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: 0.4 + Math.random() * 0.6, c, s: sz * (0.5 + Math.random()) });
+  }
+}
+function float(x, y, s, c, big) { G.texts.push({ x, y, s, c, t: 0, big: !!big }); }
+const P = (a, r) => [CX + Math.cos(a) * r, CY + Math.sin(a) * r];
+
+// ---------- game flow ----------
+function startRun() {
+  audio();
+  Object.assign(G, {
+    state: 'play', rt: 0, a: -Math.PI / 2, lane: 0, from: 0, w: 1.7, score: 0, mult: 1,
+    obs: [], gems: [], texts: [], trail: [], next: -Math.PI / 2 + 1.8, runShards: 0,
+    lastFlip: -9, newBest: false, slow: 1, hit: 0, beatT: 0, beatN: 0, unlockedNow: []
+  });
+  G.r = laneR(0);
+  SFX.start();
+}
+function flip() {
+  if (G.state !== 'play') return;
+  G.from = G.lane; G.lane ^= 1; G.lastFlip = G.rt; G.squash = 1;
+  const [x, y] = P(G.a, G.r);
+  burst(x, y, 6, skinColor(), U * 0.25, U * 0.006);
+  SFX.flip();
+}
+function pause(on) {
+  if (on && G.state === 'play') G.state = 'paused';
+  else if (!on && G.state === 'paused') G.state = 'play';
+}
+function die() {
+  const [x, y] = P(G.a, G.r), s = G.save, before = s.shards;
+  G.state = 'dead'; G.deadT = 0; G.hit = 0.1; G.slow = 0.2;
+  G.shake = MQ.matches ? 4 : U * 0.05; G.flash = 1;
+  burst(x, y, 70, skinColor(), U * 0.9, U * 0.012);
+  burst(x, y, 40, RED, U * 0.6, U * 0.01);
+  s.plays++; s.shards += G.runShards;
+  if (G.score > s.best) { s.best = G.score; G.newBest = G.score > 0; }
+  G.unlockedNow = SKINS.filter(k => before < k.cost && s.shards >= k.cost).map(k => k.name);
+  store();
+  SFX.die();
+  if (G.newBest || G.unlockedNow.length) SFX.best();
+}
+function selectSkin(i) {
+  if (unlocked(i)) { G.save.skin = i; store(); SFX.click(); }
+  else { SFX.deny(); float(CX, H - uiRow() - U * 0.07, (SKINS[i].cost - G.save.shards) + ' more shards', GOLD); }
+}
+function cycleSkin(d) {
+  for (let k = 1; k < SKINS.length; k++) {
+    const i = (G.save.skin + d * k + SKINS.length * 2) % SKINS.length;
+    if (unlocked(i)) { G.save.skin = i; store(); SFX.click(); return; }
+  }
+  SFX.deny();
+}
+
+function spawn() {
+  const d = Math.min(G.score / 160, 1), e = Math.min(Math.max(0, G.score - 160) / 600, 1), A = G.next, l = Math.random() < 0.5 ? 0 : 1;
+  const mk = (a, l) => ({ a, l, t: 0, hw: 0.11, passed: false });
+  G.obs.push(mk(A, l));
+  let end = A;
+  if (d > 0.1 && Math.random() < 0.15 + 0.3 * d + 0.2 * e) { end = A + 0.78 - 0.16 * d; G.obs.push(mk(end, 1 - l)); }
+  const gap = 1.05 - 0.45 * d + Math.random() * 0.4;
+  if (Math.random() < 0.6) G.gems.push({ a: end + gap / 2, l: Math.random() < 0.5 ? 0 : 1, t: 0, spin: Math.random() * TAU });
+  G.next = end + gap;
+}
+
+function play(dt) {
+  G.rt += dt;
+  G.w = Math.min(1.7 + G.score * 0.01, 3.2) + 0.6 * (1 - Math.exp(-Math.max(0, G.score - 150) / 400));
+  G.a += G.w * dt;
+  G.r += (laneR(G.lane) - G.r) * Math.min(1, dt * 26);
+  const [px, py] = P(G.a, G.r), pa = PR() / G.r * 0.6, tol = U * 0.055;
+  G.trail.push(px, py); if (G.trail.length > 44) G.trail.splice(0, 2);
+  while (G.next < G.a + 3.3) spawn();
+
+  for (const o of G.obs) {
+    o.t += dt;
+    if (o.passed) continue;
+    const on = Math.abs(G.r - laneR(o.l)) < tol;
+    if (o.t > 0.3 && on && Math.abs(G.a - o.a) < o.hw + pa) { die(); return; }
+    if (G.a > o.a + o.hw + pa) {
+      o.passed = true;
+      const close = G.from === o.l && G.rt - G.lastFlip < 0.3;
+      const pts = G.mult * (close ? 2 : 1);
+      G.score += pts; G.pop = 1;
+      const [ox, oy] = P(o.a, laneR(o.l));
+      if (close) { float(ox, oy, 'CLOSE +' + pts, '#fff', true); burst(ox, oy, 14, '#fff', U * 0.35, U * 0.007); SFX.close(); G.shake = Math.max(G.shake, MQ.matches ? 0 : U * 0.006); }
+      else { float(ox, oy, '+' + pts, 'rgba(255,255,255,.7)'); SFX.dodge(); }
+    }
+  }
+  G.obs = G.obs.filter(o => G.a < o.a + 1.2);
+
+  for (const g of G.gems) {
+    g.t += dt;
+    if (g.taken) continue;
+    const [gx, gy] = P(g.a, laneR(g.l));
+    if (Math.abs(G.a - g.a) < 0.1 && Math.abs(G.r - laneR(g.l)) < tol) {
+      g.taken = true; G.mult = Math.min(G.mult + 1, 9); G.runShards++;
+      burst(gx, gy, 22, GOLD, U * 0.45, U * 0.008);
+      float(gx, gy, 'x' + G.mult, GOLD, true); SFX.gem(); G.beat = 1;
+    } else if (G.a > g.a + 0.12) {
+      g.taken = true;
+      if (G.mult > 1) { G.mult = 1; float(gx, gy, 'COMBO LOST', RED, true); SFX.lose(); }
+    }
+  }
+  G.gems = G.gems.filter(g => !g.taken || G.a < g.a + 0.3);
+
+  const spb = 60 / (112 + (G.w - 1.7) * 26);
+  G.beatT += dt;
+  if (G.beatT >= spb) { G.beatT -= spb; SFX.beat(G.beatN++); G.beat = Math.max(G.beat, 0.6); }
+}
+
+function update(dt) {
+  G.t += dt;
+  if (G.state === 'dead') G.deadT += dt;
+  G.flash = Math.max(0, G.flash - dt * 2.5);
+  if (G.hit > 0) { G.hit -= dt; return; }
+  G.slow += (1 - G.slow) * Math.min(1, dt * 1.6);
+  const s = dt * G.slow;
+  G.shake *= Math.exp(-dt * 7); if (G.shake < 0.2) G.shake = 0;
+  G.pop = Math.max(0, G.pop - dt * 5); G.beat = Math.max(0, G.beat - dt * 3); G.squash = Math.max(0, G.squash - dt * 6);
+  for (const p of G.parts) { p.life += s; p.x += p.vx * s; p.y += p.vy * s; p.vx *= Math.exp(-s * 2.5); p.vy *= Math.exp(-s * 2.5); }
+  G.parts = G.parts.filter(p => p.life < p.max);
+  for (const t of G.texts) { t.t += s; t.y -= U * 0.08 * s; }
+  G.texts = G.texts.filter(t => t.t < 0.9);
+  if (G.state === 'play') play(s);
+  else if (G.state === 'menu') { G.a += dt * 1.1; G.r += (laneR(0) - G.r) * Math.min(1, dt * 8); }
+}
+
+// ---------- rendering ----------
+const uiRow = () => Math.max(64, H * 0.1);
+function swatches() {
+  const n = SKINS.length, sz = Math.min(44, (W - 32) / n - 8), gap = sz + 10, y = H - uiRow();
+  return SKINS.map((k, i) => ({ x: CX + (i - (n - 1) / 2) * gap, y, r: sz / 2 }));
+}
+const muteBox = () => ({ x: W - 52, y: 8, w: 44, h: 44 });
+
+function text(s, x, y, size, c, weight, align, spacing) {
+  cx.font = (weight || 700) + ' ' + size + 'px ' + FONT;
+  if (spacing && (align || 'center') === 'center') x += spacing / 2;
+  cx.textAlign = align || 'center'; cx.textBaseline = 'middle'; cx.fillStyle = c;
+  if ('letterSpacing' in cx) cx.letterSpacing = (spacing || 0) + 'px';
+  cx.fillText(s, x, y);
+  if ('letterSpacing' in cx) cx.letterSpacing = '0px';
+}
+
+function draw() {
+  const c = cx, col = skinColor();
+  c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  c.fillStyle = '#07070d'; c.fillRect(0, 0, W, H);
+  const bg = c.createRadialGradient(CX, CY, 0, CX, CY, Math.max(W, H) * 0.7);
+  bg.addColorStop(0, 'rgba(60,40,120,' + (0.28 + G.beat * 0.12) + ')'); bg.addColorStop(1, 'rgba(7,7,13,0)');
+  c.fillStyle = bg; c.fillRect(0, 0, W, H);
+
+  c.save();
+  if (G.shake) c.translate((Math.random() - 0.5) * G.shake, (Math.random() - 0.5) * G.shake);
+
+  // stars
+  const R = Math.hypot(W, H) / 2, rot = G.a * 0.04;
+  for (const s of STARS) {
+    const [x, y] = P(s.a + rot, s.d * R);
+    c.globalAlpha = 0.25 + 0.35 * Math.sin(G.t * 2 + s.p) ** 2;
+    c.fillStyle = '#cfd6ff'; c.fillRect(x, y, s.s, s.s);
+  }
+  c.globalAlpha = 1;
+
+  // lanes
+  for (let l = 0; l < 2; l++) {
+    c.beginPath(); c.arc(CX, CY, laneR(l), 0, TAU);
+    c.strokeStyle = 'rgba(255,255,255,' + (0.07 + (G.lane === l && G.state === 'play' ? 0.05 : 0)) + ')';
+    c.lineWidth = 1.5; c.stroke();
+  }
+  if (G.beat > 0) {
+    c.beginPath(); c.arc(CX, CY, laneR(1) + (1 - G.beat) * U * 0.2, 0, TAU);
+    c.strokeStyle = 'rgba(255,255,255,' + G.beat * 0.08 + ')'; c.lineWidth = 2; c.stroke();
+  }
+
+  // core with score
+  const cr = U * (0.105 + G.beat * 0.008 + G.pop * 0.01);
+  const cg = c.createRadialGradient(CX, CY, 0, CX, CY, cr);
+  cg.addColorStop(0, 'rgba(255,255,255,0.10)'); cg.addColorStop(1, 'rgba(255,255,255,0.02)');
+  c.fillStyle = cg; c.beginPath(); c.arc(CX, CY, cr, 0, TAU); c.fill();
+  c.strokeStyle = col; c.globalAlpha = 0.35; c.lineWidth = 2; c.stroke(); c.globalAlpha = 1;
+  if (G.state === 'play' || G.state === 'paused') {
+    text(String(G.score), CX, CY - U * 0.012, U * (0.075 + G.pop * 0.015), '#fff', 800);
+    text('x' + G.mult, CX, CY + U * 0.052, U * 0.03, G.mult > 1 ? GOLD : 'rgba(255,255,255,.45)', 700, 'center', 2);
+  }
+
+  // obstacles
+  c.lineCap = 'round';
+  for (const o of G.obs) {
+    const ready = Math.min(1, o.t / 0.3), fade = o.passed ? Math.max(0, 1 - (G.a - o.a - o.hw) * 3) : 1;
+    c.globalAlpha = (0.25 + 0.75 * ready) * fade;
+    c.strokeStyle = RED; c.shadowColor = RED; c.shadowBlur = ready * 16;
+    c.lineWidth = U * 0.05 * (0.5 + 0.5 * ready);
+    c.beginPath(); c.arc(CX, CY, laneR(o.l), o.a - o.hw, o.a + o.hw); c.stroke();
+  }
+  c.shadowBlur = 0; c.globalAlpha = 1;
+
+  // gems
+  for (const g of G.gems) {
+    if (g.taken) continue;
+    const [x, y] = P(g.a, laneR(g.l)), s = U * 0.02 * Math.min(1, g.t * 4) * (1 + 0.12 * Math.sin(G.t * 8 + g.spin));
+    c.save(); c.translate(x, y); c.rotate(G.t * 2 + g.spin);
+    c.fillStyle = GOLD; c.shadowColor = GOLD; c.shadowBlur = 14;
+    c.beginPath(); c.moveTo(0, -s); c.lineTo(s * 0.7, 0); c.lineTo(0, s); c.lineTo(-s * 0.7, 0); c.closePath(); c.fill();
+    c.restore();
+  }
+
+  // trail + player
+  c.globalCompositeOperation = 'lighter';
+  const tr = G.trail;
+  for (let i = 2; i < tr.length; i += 2) {
+    const k = i / tr.length;
+    c.strokeStyle = col; c.globalAlpha = k * 0.5; c.lineWidth = PR() * 1.6 * k;
+    c.beginPath(); c.moveTo(tr[i - 2], tr[i - 1]); c.lineTo(tr[i], tr[i + 1]); c.stroke();
+  }
+  c.globalAlpha = 1;
+  if (G.state !== 'dead') {
+    const [x, y] = P(G.a, G.r), pr = PR();
+    c.save(); c.translate(x, y); c.rotate(G.a);
+    c.scale(1 + G.squash * 0.45, 1 - G.squash * 0.3);
+    c.fillStyle = col; c.shadowColor = col; c.shadowBlur = 24;
+    c.beginPath(); c.arc(0, 0, pr, 0, TAU); c.fill();
+    c.shadowBlur = 0; c.fillStyle = '#fff'; c.beginPath(); c.arc(0, 0, pr * 0.45, 0, TAU); c.fill();
+    c.restore();
+  }
+  // particles
+  for (const p of G.parts) {
+    const k = 1 - p.life / p.max;
+    c.globalAlpha = k; c.fillStyle = p.c;
+    c.beginPath(); c.arc(p.x, p.y, p.s * k + 0.5, 0, TAU); c.fill();
+  }
+  c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+
+  // floating text
+  for (const t of G.texts) {
+    const k = t.t / 0.9, pop = t.big ? 1 + Math.max(0, 0.4 - t.t) * 1.5 : 1;
+    c.globalAlpha = 1 - k * k;
+    text(t.s, t.x, t.y, U * (t.big ? 0.034 : 0.026) * pop, t.c, 800, 'center', 1);
+  }
+  c.globalAlpha = 1;
+  c.restore();
+
+  if (G.flash) { c.fillStyle = 'rgba(255,255,255,' + G.flash * (MQ.matches ? 0.15 : 0.45) + ')'; c.fillRect(0, 0, W, H); }
+  overlay();
+}
+
+function overlay() {
+  const c = cx, s = G.save, pulse = 0.55 + 0.45 * Math.sin(G.t * 4);
+  // mute button
+  const m = muteBox(), mx = m.x + 22, my = m.y + 22;
+  c.fillStyle = 'rgba(255,255,255,.55)'; c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(mx - 10, my - 4); c.lineTo(mx - 5, my - 4); c.lineTo(mx + 1, my - 9); c.lineTo(mx + 1, my + 9); c.lineTo(mx - 5, my + 4); c.lineTo(mx - 10, my + 4); c.closePath(); c.fill();
+  c.beginPath();
+  if (s.muted) { c.moveTo(mx + 5, my - 5); c.lineTo(mx + 13, my + 5); c.moveTo(mx + 13, my - 5); c.lineTo(mx + 5, my + 5); }
+  else { c.arc(mx + 2, my, 7, -0.8, 0.8); c.moveTo(mx + 7, my - 8); c.arc(mx + 2, my, 11, -0.8, 0.8); }
+  c.stroke();
+
+  if (G.state === 'play') { text('BEST ' + s.best, 16, 30, 13, 'rgba(255,255,255,.45)', 700, 'left', 2); return; }
+
+  c.fillStyle = 'rgba(7,7,13,.55)'; c.fillRect(0, 0, W, H);
+  const big = Math.min(U * 0.16, 110);
+  if (G.state === 'paused') {
+    text('PAUSED', CX, CY, big * 0.5, '#fff', 800, 'center', 6);
+    text('tap to resume', CX, CY + big * 0.45, 15, 'rgba(255,255,255,' + pulse + ')', 600, 'center', 2);
+    return;
+  }
+  if (G.state === 'menu') {
+    text('ORBIT', CX, H * 0.2, big, '#fff', 900, 'center', big * 0.18);
+    text('ONE TAP. TWO RINGS. NO MERCY.', CX, H * 0.2 + big * 0.62, Math.max(11, big * 0.13), skinColor(), 700, 'center', 3);
+    text('Tap / Space flips rings  ·  dodge red  ·  chain gold for multiplier', CX, H * 0.2 + big * 0.95, Math.max(11, Math.min(14, U * 0.02)), 'rgba(255,255,255,.55)', 500);
+    text('TAP TO PLAY', CX, CY, Math.max(14, U * 0.032), 'rgba(255,255,255,' + pulse + ')', 800, 'center', 4);
+  } else {
+    const y0 = H * 0.2;
+    text(G.newBest ? 'NEW BEST' : 'SCORE', CX, y0, Math.max(13, big * 0.16), G.newBest ? GOLD : 'rgba(255,255,255,.6)', 800, 'center', 6);
+    const k = Math.min(1, G.deadT * 4);
+    text(String(G.score), CX, y0 + big * 0.7, big * (0.6 + 0.4 * (1 - (1 - k) ** 3)), '#fff', 900);
+    text('BEST ' + s.best + '   ·   +' + G.runShards + ' SHARDS', CX, y0 + big * 1.35, Math.max(12, big * 0.14), 'rgba(255,255,255,.7)', 700, 'center', 2);
+    if (G.unlockedNow.length) text('UNLOCKED: ' + G.unlockedNow.join(', ').toUpperCase(), CX, y0 + big * 1.65, Math.max(12, big * 0.14), GOLD, 800, 'center', 3);
+    if (G.deadT > 0.35) text('TAP TO RETRY', CX, CY, Math.max(14, U * 0.032), 'rgba(255,255,255,' + pulse + ')', 800, 'center', 4);
+  }
+  // skin picker + progression
+  const sw = swatches();
+  sw.forEach((p, i) => {
+    const open = unlocked(i), sel = s.skin === i;
+    c.beginPath(); c.arc(p.x, p.y, p.r * (sel ? 1 : 0.8), 0, TAU);
+    c.fillStyle = open ? skinColor(i) : 'rgba(255,255,255,.08)'; c.fill();
+    if (sel) { c.lineWidth = 2; c.strokeStyle = '#fff'; c.beginPath(); c.arc(p.x, p.y, p.r + 5, 0, TAU); c.stroke(); }
+    if (!open) text(String(SKINS[i].cost), p.x, p.y, Math.max(9, p.r * 0.55), 'rgba(255,255,255,.6)', 700);
+  });
+  const nxt = SKINS.find(k => s.shards < k.cost), by = sw[0].y + sw[0].r + 22;
+  text(SKINS[s.skin].name.toUpperCase() + (nxt ? '   ·   ' + s.shards + ' / ' + nxt.cost + ' shards to ' + nxt.name.toUpperCase() : '   ·   ALL SKINS UNLOCKED'), CX, by, 12, 'rgba(255,255,255,.55)', 700, 'center', 2);
+  if (G.state === 'menu') text('BEST ' + s.best + '  ·  RUNS ' + s.plays, CX, sw[0].y - sw[0].r - 20, 12, 'rgba(255,255,255,.4)', 700, 'center', 2);
+}
+
+// ---------- input ----------
+function press(x, y) {
+  audio();
+  if (x != null) {
+    const m = muteBox();
+    if (x >= m.x && x <= m.x + m.w && y >= m.y && y <= m.y + m.h) { setMuted(!G.save.muted); return; }
+    if (G.state === 'menu' || G.state === 'dead') {
+      const i = swatches().findIndex(p => Math.hypot(x - p.x, y - p.y) < p.r + 8);
+      if (i >= 0) { selectSkin(i); return; }
+    }
+  }
+  if (G.state === 'menu') startRun();
+  else if (G.state === 'dead') { if (G.deadT > 0.35) startRun(); }
+  else if (G.state === 'paused') pause(false);
+  else flip();
+}
+cv.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (!e.isPrimary || e.button !== 0) return; // ignore extra fingers and right/middle clicks
+  cv.focus(); press(e.clientX, e.clientY);
+});
+cv.addEventListener('contextmenu', e => e.preventDefault());
+addEventListener('keydown', e => {
+  const k = e.code;
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) e.preventDefault();
+  if (e.repeat) return;
+  if (k === 'KeyM') { audio(); setMuted(!G.save.muted); }
+  else if (k === 'KeyP' || k === 'Escape') { if (G.state === 'play') pause(true); else pause(false); }
+  else if ((k === 'ArrowLeft' || k === 'ArrowRight') && (G.state === 'menu' || G.state === 'dead')) cycleSkin(k === 'ArrowLeft' ? -1 : 1);
+  else if (['Space', 'Enter', 'ArrowUp', 'ArrowDown', 'KeyW', 'KeyS', 'KeyZ', 'KeyX'].includes(k)) press();
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(true); });
+addEventListener('blur', () => pause(true));
+
+// ---------- loop ----------
+resize();
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 0.05); last = now;
+  update(dt); draw();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
