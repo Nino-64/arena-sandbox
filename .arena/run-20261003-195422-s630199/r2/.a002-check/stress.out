@@ -1,6 +1,0 @@
-   exemple de fausse alerte : transparent 1 [(1800000182.110555, 'a1', 'alerte'), (1800003603.5806422, 'a1', 'critique'), (1800017967.559722, 'a1', 'alerte')]
-stress     transparent    veilles=  216 fausses_alertes= 23 morts_non_vus=0 alertes_en_double=0 délai_max_détection=239s d'éveil
-stress     wall           veilles=  216 fausses_alertes=  0 morts_non_vus=0 alertes_en_double=0 délai_max_détection=245s d'éveil
-   exemple de fausse alerte : wall-skip-all 0 [(1800005682.60908, 'dead', 'alerte'), (1800048611.4826643, 'a1', 'alerte'), (1800048611.4826643, 'forge', 'alerte')]
-stress     wall-skip-all  veilles=  216 fausses_alertes= 10 morts_non_vus=0 alertes_en_double=0 délai_max_détection=227s d'éveil
-exit 0
