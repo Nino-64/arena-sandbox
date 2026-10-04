@@ -1,0 +1,16 @@
+{
+  "match": "r1-m01",
+  "scores": {
+    "a002": {"correctness": 9, "completeness": 10, "specificity": 9, "robustness": 10, "clarity": 7, "fatal": false},
+    "a004": {"correctness": 9, "completeness": 9, "specificity": 9, "robustness": 10, "clarity": 8, "fatal": false}
+  },
+  "winner": "a002",
+  "reason": "Both fixed or correctly rebutted every attack (a004's factur-x rebuttal holds in the 7.2 source), but a002's B2B scenario completes end to end without the user and its synergy core is specified down to persisted cursors, idempotent actions and sleep-safe heartbeats (checked), whereas a004's HERMES scenario ends at a draft plus a 'find the contact' to-do, which outweighs a004's cleaner, tighter write-up.",
+  "survived": [
+    "ETF look-through ignored synthetic PEA replication (MAJOR): fixed, index weights used and figures recomputed",
+    "FORGE auto-merged LLM-written code from hostile pages (MAJOR): fixed, selectors-only repair via closed schema, code goes to PR",
+    "no heartbeat mechanism behind the silent-agent alert (MINOR): fixed, agents table plus heartbeat() and watchdog_tick()",
+    "global dedup_key collisions and ambiguous None from emit (MINOR): fixed, per-agent/topic key and (id, status) return"
+  ],
+  "standing": {"a002": [], "a004": []}
+}
