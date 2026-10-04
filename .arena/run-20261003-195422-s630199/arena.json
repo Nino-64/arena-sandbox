@@ -26,7 +26,7 @@
      "how": "Be exhaustive and exact. Check every step, verify every claim, and leave no hand-waving anywhere."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20261003-195422-s630199/r1/r1-m02.a001.solution.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20261003-195422-s630199/r2/r2-m01.a001.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -50,10 +50,10 @@
      "how": "Optimise for the fastest route to something usable today. Cut anything that does not move the result."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20261003-195422-s630199/r1/r1-m01.a002.solution.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20261003-195422-s630199/r2/r2-m01.a002.solution.md",
+   "alive": false,
+   "eliminated_in": 2,
+   "eliminated_by": "a001",
    "byes": 0
   },
   "a003": {
@@ -169,18 +169,26 @@
      "id": "r2-m01",
      "a": "a002",
      "b": "a001",
-     "winner": null,
-     "loser": null,
-     "reason": null,
-     "survived": [],
-     "scores": null,
-     "source": null
+     "winner": "a001",
+     "loser": "a002",
+     "reason": "Both are equally correct, complete and fully robust (I ran a002's revised watchdog against both counterexamples plus 400 random sleeps with zero false alerts, and confirmed a001's LFSS 2026 CSG rebuttal), so a001's greater specificity (exact endpoints, quotas, schedules and numeric rules for every agent) narrowly outweighs a002's tighter, easier-to-read presentation.",
+     "survived": [
+      "SISMOGRAPHE levels 3-4 unreachable in a fast crisis: fixed with per-source latency, a fast path and 'en attente' slow indicators (level 3 reached at 02:07 in the scenario)",
+      "z-score with no variance floor: fixed with sigma* = max(sigma, sqrt(mu), 1), a 5-article minimum, a cheap pre-check and at most 3 costly analyses per scenario per day",
+      "Anki/AnkiConnect cannot run on a headless NAS: fixed with an Xvfb container (restart policy, webBindAddress, apiKey) and two explicit deployment modes",
+      "CSG 18.6 % / PFU 31.4 % called false: correctly rebutted, LFSS 2026 (loi n. 2025-1403, art. 12) raised CSG on capital income to 10.6 %, with assurance-vie, property income and real-estate gains left at 17.2 %"
+     ],
+     "scores": {
+      "a002": 92.0,
+      "a001": 92.5
+     },
+     "source": "judge"
     }
    ],
    "bye": null,
-   "closed": false
+   "closed": true
   }
  ],
- "champion": null,
+ "champion": "a001",
  "final": null
 }

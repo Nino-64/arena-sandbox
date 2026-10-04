@@ -1,0 +1,16 @@
+{
+  "match": "r2-m01",
+  "scores": {
+    "a002": {"correctness": 9, "completeness": 10, "specificity": 8, "robustness": 10, "clarity": 8, "fatal": false},
+    "a001": {"correctness": 9, "completeness": 10, "specificity": 9, "robustness": 10, "clarity": 7, "fatal": false}
+  },
+  "winner": "a001",
+  "reason": "Both are equally correct, complete and fully robust (I ran a002's revised watchdog against both counterexamples plus 400 random sleeps with zero false alerts, and confirmed a001's LFSS 2026 CSG rebuttal), so a001's greater specificity (exact endpoints, quotas, schedules and numeric rules for every agent) narrowly outweighs a002's tighter, easier-to-read presentation.",
+  "survived": [
+    "SISMOGRAPHE levels 3-4 unreachable in a fast crisis: fixed with per-source latency, a fast path and 'en attente' slow indicators (level 3 reached at 02:07 in the scenario)",
+    "z-score with no variance floor: fixed with sigma* = max(sigma, sqrt(mu), 1), a 5-article minimum, a cheap pre-check and at most 3 costly analyses per scenario per day",
+    "Anki/AnkiConnect cannot run on a headless NAS: fixed with an Xvfb container (restart policy, webBindAddress, apiKey) and two explicit deployment modes",
+    "CSG 18.6 % / PFU 31.4 % called false: correctly rebutted, LFSS 2026 (loi n. 2025-1403, art. 12) raised CSG on capital income to 10.6 %, with assurance-vie, property income and real-estate gains left at 17.2 %"
+  ],
+  "standing": {"a002": [], "a001": []}
+}
