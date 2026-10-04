@@ -26,7 +26,7 @@
      "how": "Be exhaustive and exact. Check every step, verify every claim, and leave no hand-waving anywhere."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20261003-195422-s630199/r0/a001.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20261003-195422-s630199/r1/r1-m02.a001.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -50,7 +50,7 @@
      "how": "Optimise for the fastest route to something usable today. Cut anything that does not move the result."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20261003-195422-s630199/r0/a002.md",
+   "solution": "/home/user/arena-sandbox/.arena/run-20261003-195422-s630199/r1/r1-m01.a002.solution.md",
    "alive": true,
    "eliminated_in": null,
    "eliminated_by": null,
@@ -74,10 +74,10 @@
      "how": "Hunt the edge cases, failure modes and weird inputs first, and design the answer around surviving them."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20261003-195422-s630199/r0/a003.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20261003-195422-s630199/r1/r1-m02.a003.solution.md",
+   "alive": false,
+   "eliminated_in": 1,
+   "eliminated_by": "a001",
    "byes": 0
   },
   "a004": {
@@ -98,10 +98,10 @@
      "how": "Pick the least complicated answer that fully does the job. Every extra part has to justify itself."
     }
    },
-   "solution": "/home/user/arena-sandbox/.arena/run-20261003-195422-s630199/r0/a004.md",
-   "alive": true,
-   "eliminated_in": null,
-   "eliminated_by": null,
+   "solution": "/home/user/arena-sandbox/.arena/run-20261003-195422-s630199/r1/r1-m01.a004.solution.md",
+   "alive": false,
+   "eliminated_in": 1,
+   "eliminated_by": "a002",
    "byes": 0
   }
  },
@@ -119,17 +119,56 @@
      "id": "r1-m01",
      "a": "a002",
      "b": "a004",
-     "winner": null,
-     "loser": null,
-     "reason": null,
-     "survived": [],
-     "scores": null,
-     "source": null
+     "winner": "a002",
+     "loser": "a004",
+     "reason": "Both fixed or correctly rebutted every attack (a004's factur-x rebuttal holds in the 7.2 source), but a002's B2B scenario completes end to end without the user and its synergy core is specified down to persisted cursors, idempotent actions and sleep-safe heartbeats (checked), whereas a004's HERMES scenario ends at a draft plus a 'find the contact' to-do, which outweighs a004's cleaner, tighter wri",
+     "survived": [
+      "ETF look-through ignored synthetic PEA replication (MAJOR): fixed, index weights used and figures recomputed",
+      "FORGE auto-merged LLM-written code from hostile pages (MAJOR): fixed, selectors-only repair via closed schema, code goes to PR",
+      "no heartbeat mechanism behind the silent-agent alert (MINOR): fixed, agents table plus heartbeat() and watchdog_tick()",
+      "global dedup_key collisions and ambiguous None from emit (MINOR): fixed, per-agent/topic key and (id, status) return"
+     ],
+     "scores": {
+      "a002": 92.5,
+      "a004": 91.0
+     },
+     "source": "judge"
     },
     {
      "id": "r1-m02",
      "a": "a001",
      "b": "a003",
+     "winner": "a001",
+     "loser": "a003",
+     "reason": "Both revised solutions fixed every attack and meet the full format, but a001 is more precisely actionable (named bank API with auth and access limits, exact endpoints, Moodle/AnkiConnect calls, a working event schema) and internally tighter, while a003 leaves placeholders in its manifest and carries small logic slips (an own-chain loop rule that would block VIGIE's stress-test reply, a regression ",
+     "survived": [
+      "Double-debit rule raising critical on legitimate repeat purchases: fixed (20 EUR floor, 90-day rarity, receipt check, never critical)",
+      "ActivityWatch blind to paper study: fixed (screen time can confirm a block, never refute it; no minutes carried over)",
+      "Quiet hours muting the J-1 submission alert: fixed (E/M ladder P1-P3, steps advanced to 21:30, critical at M-2h, order preserved)",
+      "FORGE auto-merging LLM selector patches on form-only checks: fixed (continuity vs last good collection, source-date check, JS-rendering detection, 24h probation)",
+      "Zero-tolerance position reconciliation broken by corporate actions: fixed (OST notices ingested, split/merger detection, zero tolerance only on unexplained gaps)"
+     ],
+     "scores": {
+      "a001": 91.5,
+      "a003": 89.0
+     },
+     "source": "judge"
+    }
+   ],
+   "bye": null,
+   "closed": true
+  },
+  {
+   "n": 2,
+   "alive": [
+    "a001",
+    "a002"
+   ],
+   "matches": [
+    {
+     "id": "r2-m01",
+     "a": "a002",
+     "b": "a001",
      "winner": null,
      "loser": null,
      "reason": null,

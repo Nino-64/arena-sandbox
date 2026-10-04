@@ -1,0 +1,17 @@
+{
+  "match": "r1-m02",
+  "scores": {
+    "a001": {"correctness": 9, "completeness": 10, "specificity": 9, "robustness": 9, "clarity": 8, "fatal": false},
+    "a003": {"correctness": 8, "completeness": 10, "specificity": 8, "robustness": 10, "clarity": 8, "fatal": false}
+  },
+  "winner": "a001",
+  "reason": "Both revised solutions fixed every attack and meet the full format, but a001 is more precisely actionable (named bank API with auth and access limits, exact endpoints, Moodle/AnkiConnect calls, a working event schema) and internally tighter, while a003 leaves placeholders in its manifest and carries small logic slips (an own-chain loop rule that would block VIGIE's stress-test reply, a regression test on pre-redesign pages with no fallback selector, a GDELT event base that is 'queried' with no method).",
+  "survived": [
+    "Double-debit rule raising critical on legitimate repeat purchases: fixed (20 EUR floor, 90-day rarity, receipt check, never critical)",
+    "ActivityWatch blind to paper study: fixed (screen time can confirm a block, never refute it; no minutes carried over)",
+    "Quiet hours muting the J-1 submission alert: fixed (E/M ladder P1-P3, steps advanced to 21:30, critical at M-2h, order preserved)",
+    "FORGE auto-merging LLM selector patches on form-only checks: fixed (continuity vs last good collection, source-date check, JS-rendering detection, 24h probation)",
+    "Zero-tolerance position reconciliation broken by corporate actions: fixed (OST notices ingested, split/merger detection, zero tolerance only on unexplained gaps)"
+  ],
+  "standing": {"a001": [], "a003": []}
+}
